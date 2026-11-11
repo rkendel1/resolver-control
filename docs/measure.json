@@ -53,7 +53,7 @@
       "lines": 0
     },
     "excluded": {
-      "files": 8,
+      "files": 9,
       "lines": 4352
     },
     "unclassified": {
@@ -256,6 +256,12 @@
     },
     {
       "path": "docs/PLATFORM-GAPS.md",
+      "class": "excluded",
+      "basis": "documentation",
+      "lines": 0
+    },
+    {
+      "path": "docs/RESOLVER-NEXT-MILESTONE.md",
       "class": "excluded",
       "basis": "documentation",
       "lines": 0
