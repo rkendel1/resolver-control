@@ -119,6 +119,18 @@ test("a deployed consumer follows a governed change made through Resolver Contro
     const history = JSON.parse(resolver(["history", "ref://prod/ai/default"]));
     assert.match(history.entries.at(-1).reason, new RegExp(`CHG-${change.number} ${change.id}`));
 
+    // An agent over MCP (FeltKit's agent endpoint): discovers the capabilities, inspects, and is refused approval.
+    const agentToken = execFileSync(feltkit, ["session", "create", "--id", "ops-agent", "--role", "agent", "--type", "agent"], { cwd: project, encoding: "utf8" }).match(/fks_[A-Za-z0-9_-]+/)[0];
+    const rpc = async (method, params) => (await (await fetch(`${appUrl}/mcp`, { method: "POST", headers: { authorization: `Bearer ${agentToken}`, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })).json()).result;
+    await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "e2e", version: "1" } });
+    const tools = (await rpc("tools/list", {})).tools;
+    const tool = (capability) => tools.find((x) => x.name.replace(/[_.-]/g, ".") === capability)?.name;
+    for (const capability of ["dependencies.list", "dependencies.inspect", "changes.propose", "changes.approve", "insights.list"]) assert.ok(tool(capability), `MCP exposes ${capability}: ${tools.map((x) => x.name).join(", ")}`);
+    const listed = await rpc("tools/call", { name: tool("dependencies.list"), arguments: {} });
+    assert.ok(!listed.isError && JSON.stringify(listed).includes("ref://prod/ai/default"));
+    const approval = await rpc("tools/call", { name: tool("changes.approve"), arguments: { id: change.id } });
+    assert.equal(approval.isError, true, "an agent cannot approve");
+
     // The component reports its health into the application's.
     const health = await (await fetch(`${appUrl}/_feltkit/health`)).json();
     assert.equal(health.components.resolver.state, "ready");
