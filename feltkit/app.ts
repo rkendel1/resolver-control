@@ -266,16 +266,12 @@ export const candidates = app.collection("candidates", {
   submittedAt: s.number(),
 }, { unique: [["fingerprint"]], indexes: [{ fields: ["status"] }], description: "Embedded operational decisions that could be explicit runtime dependencies." });
 
-/** Append-only audit trail; each event names the AppPort request that caused it. */
-export const events = app.collection("events", {
-  seq: s.integer(),
-  subjectType: s.enum(["dependency", "change", "policy", "settings", "consumer", "candidate", "sync"]),
-  subjectId: s.string(),
-  ref: s.optional(s.string()),
-  type: s.string(),
-  actor: s.string(),
-  actorType: s.string(),
-  at: s.number(),
-  requestId: s.string(),
-  data: s.optional(s.record(s.unknown())),
-}, { indexes: [{ fields: ["ref"] }, { fields: ["subjectId"] }], description: "What happened, who did it, from which request." });
+/**
+ * The audit trail (FeltKit app.auditTrail): each event is written in the same transaction as the change it
+ * describes, with the actor, the AppPort request id and a per-subject FeltDB sequence. A reference's own
+ * events use subject "dependency" with the reference as id; a change's use subject "change".
+ */
+export const events = app.auditTrail("events", {
+  subjects: ["dependency", "change", "policy", "settings", "consumer", "candidate", "sync"] as const,
+  description: "What happened, who did it, from which request.",
+});

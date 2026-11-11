@@ -139,7 +139,7 @@ async function propose(ctx: MutationCtx, p: Proposal) {
     proposedAt: now,
     updatedAt: now,
   });
-  await record(ctx, "change", id, "change.proposed", { number, operation: p.operation, basedOnRevision: p.basedOnRevision, reason: p.reason, requiredApprovals: impact.requiredApprovals }, p.ref);
+  await record(ctx, "change", id, "change.proposed", { number, operation: p.operation, basedOnRevision: p.basedOnRevision, reason: p.reason, requiredApprovals: impact.requiredApprovals });
   return (await ctx.db.get(changes, id))!;
 }
 
@@ -259,8 +259,8 @@ export const approve = app.mutation({
     const approvals = [...change.approvals, { by: who.id, at: Date.now(), ...(note ? { note } : {}) }];
     const status = approvals.length >= required ? "approved" : "ready";
     await ctx.db.patch(changes, id, { approvals, status, updatedAt: Date.now() });
-    await record(ctx, "change", id, "change.approval_recorded", { number: change.number, approvals: approvals.length, required, note: note ?? null }, change.ref);
-    if (status === "approved") await record(ctx, "change", id, "change.approved", { number: change.number, approvers: approvals.map((a) => a.by) }, change.ref);
+    await record(ctx, "change", id, "change.approval_recorded", { number: change.number, approvals: approvals.length, required, note: note ?? null });
+    if (status === "approved") await record(ctx, "change", id, "change.approved", { number: change.number, approvers: approvals.map((a) => a.by) });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -276,7 +276,7 @@ export const reject = app.mutation({
     const change = await load(ctx, id);
     if (!["proposed", "ready", "approved"].includes(change.status)) fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status}.`);
     await ctx.db.patch(changes, id, { status: "rejected", decision: { outcome: "rejected", by: who.id, at: Date.now(), note }, updatedAt: Date.now() });
-    await record(ctx, "change", id, "change.rejected", { number: change.number, note }, change.ref);
+    await record(ctx, "change", id, "change.rejected", { number: change.number, note });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -292,7 +292,7 @@ export const cancel = app.mutation({
     if (change.proposedBy !== who.id) fail("FORBIDDEN", "Only the proposer may withdraw a change; others reject it.");
     if (!["proposed", "ready", "approved", "invalid"].includes(change.status)) fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status}.`);
     await ctx.db.patch(changes, id, { status: "cancelled", decision: { outcome: "cancelled", by: who.id, at: Date.now(), ...(note ? { note } : {}) }, updatedAt: Date.now() });
-    await record(ctx, "change", id, "change.cancelled", { number: change.number, note: note ?? null }, change.ref);
+    await record(ctx, "change", id, "change.cancelled", { number: change.number, note: note ?? null });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -338,7 +338,7 @@ export const recordValidation = app.mutation({
     const passed = !checks.some((c) => c.outcome === "fail");
     const status = superseded ? "superseded" : passed ? "ready" : "invalid";
     await ctx.db.patch(changes, id, { status, validation: { at: Date.now(), by: who.id, passed, checks }, updatedAt: Date.now() });
-    await record(ctx, "change", id, `change.${status === "ready" ? "validated" : status}`, { number: change.number, failed: checks.filter((c) => c.outcome === "fail").map((c) => c.id), deferred: checks.filter((c) => c.outcome === "deferred").map((c) => c.id), ...(superseded ? { currentRevision: superseded.currentRevision } : {}) }, change.ref);
+    await record(ctx, "change", id, `change.${status === "ready" ? "validated" : status}`, { number: change.number, failed: checks.filter((c) => c.outcome === "fail").map((c) => c.id), deferred: checks.filter((c) => c.outcome === "deferred").map((c) => c.id), ...(superseded ? { currentRevision: superseded.currentRevision } : {}) });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -352,7 +352,7 @@ export const supersede = app.mutation({
     const change = await load(ctx, id);
     if (change.status !== "ready" || currentRevision === change.basedOnRevision) fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status} at revision ${change.basedOnRevision}.`);
     await ctx.db.patch(changes, id, { status: "superseded", updatedAt: Date.now() });
-    await record(ctx, "change", id, "change.superseded", { number: change.number, basedOnRevision: change.basedOnRevision, currentRevision }, change.ref);
+    await record(ctx, "change", id, "change.superseded", { number: change.number, basedOnRevision: change.basedOnRevision, currentRevision });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -375,7 +375,7 @@ export const claim = app.mutation({
       const required = requiredApprovals(policy, dependency?.criticality ?? "medium");
       if (change.approvals.length < required) {
         await ctx.db.patch(changes, id, { status: "ready", updatedAt: now });
-        await record(ctx, "change", id, "change.needs_more_approvals", { number: change.number, approvals: change.approvals.length, required }, change.ref);
+        await record(ctx, "change", id, "change.needs_more_approvals", { number: change.number, approvals: change.approvals.length, required });
         return (await ctx.db.get(changes, id))!;
       }
     } else if (!stale && change.status !== "unknown") {
@@ -383,7 +383,7 @@ export const claim = app.mutation({
     }
     const attempt = (change.execution?.attempt ?? 0) + 1;
     await ctx.db.patch(changes, id, { status: "executing", execution: { attempt, claimedBy: who.id, claimedAt: now }, updatedAt: now });
-    await record(ctx, "change", id, change.status === "approved" ? "change.execution_started" : "change.reconciliation_started", { number: change.number, attempt, previous: change.status }, change.ref);
+    await record(ctx, "change", id, change.status === "approved" ? "change.execution_started" : "change.reconciliation_started", { number: change.number, attempt, previous: change.status });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -435,7 +435,7 @@ export const settle = app.mutation({
       ...(error ? { error } : {}),
       ...(note ? { note } : {}),
       ...(verification ? { verified: verification.passed, correlated: verification.correlated, bindingMatches: verification.bindingMatches, currentRevision: verification.currentRevision } : {}),
-    }, change.ref);
+    });
     return (await ctx.db.get(changes, id))!;
   },
 });

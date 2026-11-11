@@ -68,7 +68,7 @@ export const upsert = app.mutation({
         const ours = typeof entry.reason === "string" && entry.reason.includes(CORRELATION_PREFIX);
         if (!ours) {
           outOfBand += 1;
-          await record(ctx, "dependency", item.ref, "resolver.change.out_of_band", { revision: entry.revision, action: entry.action, resolverActor: entry.actor, reason: entry.reason ?? null, at: entry.at }, item.ref);
+          await record(ctx, "dependency", item.ref, "resolver.change.out_of_band", { revision: entry.revision, action: entry.action, resolverActor: entry.actor, reason: entry.reason ?? null, at: entry.at });
         }
       }
     }
@@ -85,7 +85,7 @@ export const hide = app.mutation({
       const existing = (await ctx.db.find(observations, { ref }, { limit: 1 }))[0];
       if (existing && existing.visible) {
         await ctx.db.patch(observations, existing.id, { visible: false, observedAt: Date.now() });
-        await record(ctx, "dependency", ref, "resolver.reference.not_visible", { lastRevision: existing.revision }, ref);
+        await record(ctx, "dependency", ref, "resolver.reference.not_visible", { lastRevision: existing.revision });
       }
     }
     return null;

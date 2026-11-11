@@ -66,7 +66,7 @@ export const resolve = app.mutation({
     if (status === "adopted" && !ref && !candidate.suggestedRef) fail("INVALID_ARGUMENT", "Name the reference the candidate becomes.");
     const resolution = { by: who.id, at: Date.now(), ...(note ? { note } : {}), ...(status === "adopted" ? { ref: ref ?? candidate.suggestedRef! } : {}) };
     await ctx.db.patch(candidates, id, { status, resolution });
-    await record(ctx, "candidate", id, `candidate.${status}`, { location: candidate.location, ref: resolution.ref ?? null, note: note ?? null }, resolution.ref);
+    await record(ctx, "candidate", id, `candidate.${status}`, { location: candidate.location, ref: resolution.ref ?? null, note: note ?? null });
     return (await ctx.db.get(candidates, id))!;
   },
 });

@@ -20,7 +20,7 @@
   "dependencies": {
     "@appport/resolver-client": "0.2.4",
     "@appport/resolver-core": "0.1.1",
-    "@feltdb/feltkit": "0.3.24",
+    "@feltdb/feltkit": "0.3.25",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },

@@ -4,8 +4,8 @@
  * says where it came from; nothing is inferred into existence.
  */
 import { fail, s, type MutationCtx } from "@feltdb/feltkit";
-import { app, CATEGORIES, CHANGE_CLASS, changes, consumers, CRITICALITY, dependencies, events, observations, policies, settings } from "./app.js";
-import { record } from "./_audit.js";
+import { app, CATEGORIES, CHANGE_CLASS, changes, consumers, CRITICALITY, dependencies, observations, policies, settings } from "./app.js";
+import { AuditEventDoc, record, referenceHistory } from "./_audit.js";
 import { describeBinding, effectivePolicy, environmentNeutral, parseRef, refIn, type WeightedTarget } from "./_rules.js";
 
 const OPEN = new Set(["proposed", "ready", "approved", "executing", "unknown"]);
@@ -73,7 +73,7 @@ const Observation = s.doc(observations);
 const Dependency = s.doc(dependencies);
 const Consumer = s.doc(consumers);
 const ChangeSummary = s.doc(changes).pick("id", "number", "operation", "status", "reason", "basedOnRevision", "proposedBy", "proposedAt", "updatedAt");
-const Event = s.doc(events);
+const Event = AuditEventDoc;
 
 export const detail = app.query({
   access: "catalog.read",
@@ -115,7 +115,7 @@ export const detail = app.query({
       consumers: await ctx.db.find(consumers, { ref }, { orderBy: [{ field: "application", direction: "asc" }] }),
       policy: { environment: policy.environment, protected: policy.protected, approvalsRequired: policy.approvalsRequired, frozen: policy.frozen, explicit: policy.explicit, ...(policy.freezeReason ? { freezeReason: policy.freezeReason } : {}) },
       changes: (await ctx.db.find(changes, { ref }, { orderBy: [{ field: "number", direction: "desc" }], limit: 25 })).map((c) => ({ id: c.id, number: c.number, operation: c.operation, status: c.status, reason: c.reason, basedOnRevision: c.basedOnRevision, proposedBy: c.proposedBy, proposedAt: c.proposedAt, updatedAt: c.updatedAt })),
-      events: await ctx.db.find(events, { ref }, { orderBy: [{ field: "at", direction: "desc" }], limit: 40 }),
+      events: await referenceHistory(ctx, ref, 40),
       counterparts: sameElsewhere
         .map((o) => ({ ref: o.ref, environment: o.environment, revision: o.revision, kind: o.kind, summary: describeBinding(o.kind, o.strategy, o.targets as WeightedTarget[]), same: observation ? canon(o) === canon(observation) : false }))
         .sort((a, b) => (a.environment < b.environment ? -1 : 1)),
@@ -160,7 +160,7 @@ export const register = app.mutation({
     };
     const id = existing ? (await ctx.db.replace(dependencies, existing.id, fields)).id : await ctx.db.insert(dependencies, fields);
     const changed = existing ? (["title", "category", "criticality", "changeClass", "owner", "contract"] as const).filter((k) => existing[k] !== fields[k]) : [];
-    await record(ctx, "dependency", args.ref, existing ? "dependency.described" : "dependency.registered", existing ? Object.fromEntries(changed.map((k) => [k, { from: existing[k] ?? null, to: fields[k] ?? null }])) : { title: args.title, criticality: args.criticality, changeClass: args.changeClass }, args.ref);
+    await record(ctx, "dependency", args.ref, existing ? "dependency.described" : "dependency.registered", existing ? Object.fromEntries(changed.map((k) => [k, { from: existing[k] ?? null, to: fields[k] ?? null }])) : { title: args.title, criticality: args.criticality, changeClass: args.changeClass });
     return (await ctx.db.get(dependencies, id))!;
   },
 });
@@ -172,7 +172,7 @@ async function declare(ctx: MutationCtx, ref: string, application: string, usage
   const existing = (await ctx.db.find(consumers, { ref, application }, { limit: 1 }))[0];
   const fields = { ref, application, ...(usage ? { usage } : {}), source, declaredBy: who.id, declaredAt: Date.now() };
   const id = existing ? (await ctx.db.replace(consumers, existing.id, fields)).id : await ctx.db.insert(consumers, fields);
-  await record(ctx, "consumer", id, "consumer.declared", { application, usage: usage ?? null, source }, ref);
+  await record(ctx, "dependency", ref, "consumer.declared", { consumer: id, application, usage: usage ?? null, source });
   return (await ctx.db.get(consumers, id))!;
 }
 
@@ -202,7 +202,7 @@ export const removeConsumer = app.mutation({
     const existing = await ctx.db.get(consumers, id);
     if (!existing) fail("NOT_FOUND", `No consumer declaration ${id}.`);
     await ctx.db.delete(consumers, id);
-    await record(ctx, "consumer", id, "consumer.removed", { application: existing.application, source: existing.source }, existing.ref);
+    await record(ctx, "dependency", existing.ref, "consumer.removed", { consumer: id, application: existing.application, source: existing.source });
     return null;
   },
 });

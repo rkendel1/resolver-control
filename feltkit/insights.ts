@@ -4,7 +4,8 @@
  * both). Nothing is estimated or invented: where the data does not exist, the finding says so.
  */
 import { s } from "@feltdb/feltkit";
-import { app, candidates, changes, consumers, dependencies, events, observations, policies, settings, syncStatus } from "./app.js";
+import { app, candidates, changes, consumers, dependencies, observations, policies, settings, syncStatus } from "./app.js";
+import { recentEvents, refOf } from "./_audit.js";
 import { CORRELATION_PREFIX, describeBinding, effectivePolicy, environmentNeutral, type WeightedTarget } from "./_rules.js";
 
 const Finding = s.object({
@@ -105,7 +106,7 @@ export const overview = app.query({
       ctx.db.find(observations, { visible: true }),
       ctx.db.find(dependencies, {}),
       ctx.db.find(changes, {}),
-      ctx.db.find(events, {}, { orderBy: [{ field: "at", direction: "desc" }], limit: 12 }),
+      recentEvents(ctx, {}, 12),
       ctx.db.count(candidates, { status: "open" }),
     ]);
     const count = <T>(items: T[], key: (item: T) => string) => items.reduce<Record<string, number>>((acc, item) => ((acc[key(item)] = (acc[key(item)] ?? 0) + 1), acc), {});
@@ -121,9 +122,9 @@ export const overview = app.query({
       changes: count(all, (c) => c.status),
       awaitingApproval: all.filter((c) => c.status === "ready").length,
       executedLast7Days: all.filter((c) => c.status === "verified" && (c.execution?.finishedAt ?? 0) > weekAgo).length,
-      outOfBandLast7Days: (await ctx.db.find(events, { type: "resolver.change.out_of_band" })).filter((e) => e.at > weekAgo).length,
+      outOfBandLast7Days: (await recentEvents(ctx, { type: "resolver.change.out_of_band" }, 1000)).filter((e) => e.at > weekAgo).length,
       openCandidates: open,
-      recent: recent.map((e) => ({ id: e.id, type: e.type, actor: e.actor, at: e.at, ...(e.ref ? { ref: e.ref } : {}) })),
+      recent: recent.map((e) => ({ id: e.id, type: e.type, actor: e.actor, at: e.at, ...(refOf(e) ? { ref: refOf(e) } : {}) })),
     };
   },
 });
