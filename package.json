@@ -1,0 +1,34 @@
+{
+  "name": "resolver-control",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Resolver Control: discover, govern, change and verify the runtime dependencies applications resolve through Resolver, without redeploying them.",
+  "scripts": {
+    "dev": "feltkit dev",
+    "build": "feltkit build",
+    "start": "feltkit start",
+    "test": "feltkit test",
+    "test:e2e": "node --test --test-concurrency=1 e2e/*.test.mjs",
+    "inspect": "feltkit inspect",
+    "typecheck": "tsc --noEmit",
+    "build:app": "feltkit build --target appboundry",
+    "discover": "node scripts/discover.mjs",
+    "demo:resolver": "node scripts/demo-resolver.mjs"
+  },
+  "dependencies": {
+    "@appport/resolver-client": "0.2.4",
+    "@appport/resolver-core": "0.1.1",
+    "@feltdb/feltkit": "0.3.24",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.1.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.7"
+  }
+}
