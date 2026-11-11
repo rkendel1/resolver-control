@@ -262,3 +262,22 @@ test("promotion: staging's binding proposed for prod; secrets stay out of every 
     await teardown(resolver, t, engine);
   }
 });
+
+test("separation of duties holds even for a person allowed to both propose and approve", async () => {
+  const { resolver, t } = await setup();
+  const engine = engineFor(t, resolver);
+  try {
+    await settle(engine, 1);
+    const pat = t.as({ id: "pat", type: "user", roles: ["engineer", "prod_approver"] });
+    const change = await pat.mutation(api.changes.proposeRetarget, { ref: "ref://prod/search", basedOnRevision: 1, binding: searchB, reason: "Switch search" });
+    await settle(engine, 1);
+    await assert.rejects(pat.mutation(api.changes.approve, { id: change.id }), /proposer of a change may not approve it/);
+    // A service principal with the permission is still not a person.
+    const service = t.as({ id: "ci-bot", type: "service", roles: ["prod_approver"] });
+    await assert.rejects(service.mutation(api.changes.approve, { id: change.id }), /Only a person/);
+    await settle(engine, 1);
+    assert.equal((await t.as("ada").query(api.changes.get, { id: change.id })).change.status, "ready");
+  } finally {
+    await teardown(resolver, t, engine);
+  }
+});
