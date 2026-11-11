@@ -134,6 +134,10 @@ export class ResolverEngine {
       await this.#execute(settings, apiKey, client, change).catch((e) => this.#log.warn(`execute CHG-${change.number}: ${asError(e).message}`));
       report.executed += 1;
     }
+    // Writes were made: observe again now, so the projection does not lag behind verified changes.
+    if (report.executed || report.reconciled) {
+      report.observed = await this.#sync(client, settings).catch((e) => (this.#log.warn(`sync after execution: ${asError(e).message}`), report.observed));
+    }
     return report;
   }
 
