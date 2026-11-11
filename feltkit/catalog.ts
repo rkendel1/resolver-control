@@ -6,7 +6,7 @@
 import { fail, s, type MutationCtx } from "@feltdb/feltkit";
 import { app, CATEGORIES, CHANGE_CLASS, changes, consumers, CRITICALITY, dependencies, events, observations, policies, settings } from "./app.js";
 import { record } from "./_audit.js";
-import { describeBinding, effectivePolicy, parseRef, refIn, type WeightedTarget } from "./_rules.js";
+import { describeBinding, effectivePolicy, environmentNeutral, parseRef, refIn, type WeightedTarget } from "./_rules.js";
 
 const OPEN = new Set(["proposed", "ready", "approved", "executing", "unknown"]);
 
@@ -248,7 +248,8 @@ export const compare = app.query({
         return o ? { environment, ref: o.ref, present: true, revision: o.revision, summary: describeBinding(o.kind, o.strategy, o.targets as WeightedTarget[]) } : { environment, ref: refIn(environment, path), present: false };
       });
       const kinds = observed.filter((o) => o.path === path).map((o) => o.kind);
-      const summaries = new Set(cells.map((c) => (c.present ? c.summary : "<missing>")));
+      // Each environment naming its own credentials is not a difference.
+      const summaries = new Set(cells.map((c) => (c.present ? environmentNeutral(c.summary!) : "<missing>")));
       return { path, ...(kinds[0] ? { kind: kinds[0] } : {}), cells, differs: summaries.size > 1 };
     });
   },

@@ -5,7 +5,7 @@
  */
 import { s } from "@feltdb/feltkit";
 import { app, candidates, changes, consumers, dependencies, events, observations, policies, settings, syncStatus } from "./app.js";
-import { CORRELATION_PREFIX, describeBinding, effectivePolicy, type WeightedTarget } from "./_rules.js";
+import { CORRELATION_PREFIX, describeBinding, effectivePolicy, environmentNeutral, type WeightedTarget } from "./_rules.js";
 
 const Finding = s.object({
   id: s.string(),
@@ -62,7 +62,7 @@ export const findings = app.query({
     for (const o of visible) paths.set(o.path, [...(paths.get(o.path) ?? []), o]);
     for (const [path, group] of paths) {
       if (group.length < 2 || group[0]!.kind === "secret") continue;
-      const shapes = new Set(group.map((o) => describeBinding(o.kind, o.strategy, o.targets as WeightedTarget[]).replace(/ref:\/\/[a-z0-9._-]+\//g, "ref://*/")));
+      const shapes = new Set(group.map((o) => environmentNeutral(describeBinding(o.kind, o.strategy, o.targets as WeightedTarget[]))));
       if (shapes.size > 1) out.push({ id: `drift:${path}`, severity: "info", basis: "observed", title: "Environments differ", detail: `${path} resolves differently in ${group.map((o) => o.environment).sort().join(", ")}. Expected during a rollout; otherwise consider a promotion.` });
     }
 

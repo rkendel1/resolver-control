@@ -111,6 +111,11 @@ export function describeBinding(kind: string, strategy: string | undefined, targ
   return `${strategy}: ${targets.map((t) => `${t.label ? `${t.label} ` : ""}${describeTarget(kind, t.value)}${strategy === "weighted" ? ` (${t.weight ?? 0})` : ""}`).join("; ")}`;
 }
 
+/** A binding description with environment namespaces removed: staging and prod naming their own credentials are the same shape. */
+export function environmentNeutral(summary: string): string {
+  return summary.replace(/ref:\/\/[a-z0-9._-]+\//g, "ref://*/");
+}
+
 /** Credential references a model binding names: an observed relationship, read from the binding itself. */
 export function credentialRefs(kind: string, targets: WeightedTarget[]): string[] {
   if (kind !== "model") return [];

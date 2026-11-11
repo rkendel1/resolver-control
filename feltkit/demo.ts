@@ -1,6 +1,6 @@
 /**
  * Demo governance metadata: policies, ownership and declared consumers for the references
- * `npm run demo:resolver` creates in a real Resolver. Nothing here touches Resolver, and
+ * `npm run demo` creates in a real Resolver. Nothing here touches Resolver, and
  * nothing claims a resolution: resolutions appear only once the component observes them.
  */
 import { s } from "@feltdb/feltkit";

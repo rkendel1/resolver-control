@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit",
     "build:app": "feltkit build --target appboundry",
     "discover": "node scripts/discover.mjs",
-    "demo:resolver": "node scripts/demo-resolver.mjs",
-    "test:artifact": "feltkit build --target appboundry && node --import tsx --test artifact-tests/*.test.ts"
+    "test:artifact": "feltkit build --target appboundry && node --import tsx --test artifact-tests/*.test.ts",
+    "demo": "node scripts/demo.mjs"
   },
   "dependencies": {
     "@appport/resolver-client": "0.2.4",
