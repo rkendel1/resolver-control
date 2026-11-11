@@ -33,7 +33,7 @@ export const app = feltkit({
     // Production approvers also decide changes in protected environments.
     prod_approver: [...READ, "changes.approve", "changes.approve.protected"],
     // Administrators set policies (protection, approvals, freezes) and the Resolver connection.
-    admin: [...READ, "catalog.write", "policies.write", "settings.write", "changes.retry", "demo.seed"],
+    admin: [...READ, "catalog.write", "policies.write", "settings.write", "demo.seed"],
     // Agents inspect, declare consumers, submit discovery findings and propose. Never approve or execute;
     // the application also refuses an approval from any non-person principal, whatever its roles.
     agent: [...READ, "consumers.write", "changes.propose", "discovery.write"],
@@ -65,7 +65,6 @@ export const app = feltkit({
   },
 });
 
-export const ENVIRONMENT_HINT = "The namespace of a reference (ref://<environment>/…).";
 
 export const CATEGORIES = ["ai", "search", "email", "communications", "payments", "identity", "storage", "analytics", "data", "processing", "integrations", "operations", "credentials", "configuration", "agents", "other"] as const;
 export const CRITICALITY = ["low", "medium", "high", "critical"] as const;
