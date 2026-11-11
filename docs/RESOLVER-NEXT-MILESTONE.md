@@ -2,7 +2,7 @@
 
 **Consumer registration, resolution observability, and enforced mutation authority.**
 
-Status: design, not implemented. Grounded in `@appport/resolver` at `c674d14` (0.3.3). File and line
+Status: **approved design; implementation in progress** (rkendel1/resolver, branch `claude/youthful-thompson-bhqeox`). Grounded in `@appport/resolver` at `c674d14` (0.3.3). File and line
 references are to `packages/server/src` there. Motivated by Resolver Control's gap register
 (`docs/PLATFORM-GAPS.md`, R1 and R4).
 
@@ -210,17 +210,56 @@ Control's component credential, next to its Resolver API key, never in state.
 * The AppBoundry companion-process gap (Resolver Control's A1). It is a separate execution-platform item,
   tracked separately.
 
-## Decisions needed before implementation
+## Approved decisions, and what they mean in the code
 
-1. **Secrets under policy.** An issuer never sees secret material, so it cannot bind a digest of it. Options:
-   (a) secret writes require an authorization that binds `op: put-secret` and the expected revision only;
-   (b) secret rotation stays outside mutation policy (grants only). Recommendation: (a). Rotation is the most
-   sensitive write, and binding the revision still prevents replay and racing.
-2. **Break-glass.** Keep it for the operator (recommended, recorded loudly), or none at all under policy.
-3. **Signature scheme.** Ed25519 JWS (self-contained, verifiable offline) is recommended over an online
-   AuthBoundry decision. Resolver already maps the AuthBoundry decision contract for capability grants, but a
-   per-change attestation must outlive the decision call and travel with the write.
-4. **Resolution recording default.** On for every tenant (recommended; bounded writes), or opt-in.
+1. **Secrets under policy.** A secret write needs an authorization bound to the reference, op `put-secret`, the
+   expected revision and its constraints (`kind`, `ttlSeconds`). It is never bound to the material. Secret values
+   never enter an authorization, the consumed-authorization row, a revision's evidence, a governance event or a
+   log line.
+2. **Operator break-glass, explicit only.** Under a policy the operator is refused like any key unless it passes
+   `breakGlass: { reason }` (non-empty). The revision records `governance: { breakGlass: true, reason, actor }`.
+   A row is written to `resolver_governance_events` in the **same transaction**. The change event every watcher
+   receives carries `governance: "break-glass"`. An API key passing `breakGlass` is refused: only the host
+   operator holds it. There is no silent bypass: `isOperator` no longer short-circuits a governed mutation.
+3. **Offline Ed25519 change authorizations.**
+   - **Format:** compact JWS (`header.payload.signature`, base64url), header `{ alg: "EdDSA", typ: "resolver-change+jws", kid }`.
+   - **Claims:** `v`, `iss`, `jti`, `tenant`, `ref`, `op` (`put` | `put-secret` | `rollback` | `revoke`), `expectedRevision`, `digest`, `iat`, `nbf`, `exp`, and optionally `decision` and `approvers`.
+   - **Digest:** the SHA-256 of a canonical JSON of the normalized request. For `put` that is kind, schema, `checkBinding`'s output and ttlSeconds. For `put-secret`, kind and ttlSeconds. For `rollback`, toRevision. For `revoke`, nothing. It comes from one function in `@appport/resolver-core`, so issuer and verifier cannot disagree.
+   - **Signing keys:** `resolver_signing_keys`, each with a key id (`kid`), issuer, Ed25519 public key and state. `active` verifies. `retired` verifies only tokens issued (`iat`) before its retirement: rotation without breaking in-flight approvals. `revoked` verifies nothing, including tokens issued before.
+   - **Verification:** local, with no network call.
+   - **Consumption:** a `resolver_authorizations` row keyed by (tenant, issuer, jti) is written with `requireAbsent` in the same FeltDB transaction as the revision.
+   - **Replay resistance:** a token cannot be replayed against another reference, revision, tenant, operation, binding or ttl, because each is a signed claim compared with the request. It cannot be used twice because of consumption.
+   - **Revision binding alone already prevents re-use:** revisions only increase, so a committed token's `expectedRevision` can never match again. Consumption adds the authoritative token→revision record, and closes the window where two writers present one token concurrently.
+4. **Resolution recording on by default.** Observed resolution facts (`resolver_resolutions`, written by Resolver)
+   and asserted usage (`resolver_usage`, reported by consumers) are separate collections. They are never merged
+   into one status.
+5. **Adoption as a lifecycle.** `resolver.adoption { ref, revision? }` reports, for one revision:
+
+   | Stage | Meaning | Source |
+   |---|---|---|
+   | **authorized** | the authorization that admitted it, or break-glass, or ungoverned | the revision's `governance` + `resolver_authorizations` |
+   | **committed** | the revision exists: actor, time, sequence number | `resolver_revisions` |
+   | **available** | served as current from its commit until superseded or revoked | the revision rows |
+   | **fetched** | consumers Resolver *observed* resolving this revision or a later one | `resolver_resolutions` (observed) |
+   | **adopted** | consumers that *reported* using it | `resolver_usage` (asserted) |
+   | **functionally verified** | not produced in this milestone: `null`, with the reason | (verification framework, next milestone) |
+
+   Notification delivery is not a stage. A watch event says a change exists; only a resolution says a consumer
+   fetched it, and only a report says it used it.
+
+### Further rules the code requires
+
+* **Trust roots are host-level.** Policies and signing keys are managed by the operator only: CLI on the state
+  host (`resolver policy …`, `resolver signing-key …`, like `resolver vault rotate`), with a required reason,
+  each change a governance event. An API key with `admin` can neither weaken a policy nor add a key: otherwise
+  it could disable governance and write.
+* **One policy decides.** For a reference and operation, the most specific matching policy applies: exact name,
+  then longest prefix, then `*`. Its issuers are the keys trusted.
+* **The commit loop distinguishes consumption from contention.** `store.commit` retries when only the sequence
+  moved. A conflict on the authorization row is reported as a consumed authorization, never retried as
+  contention.
+* **Recording never blocks resolution.** A failure to record a resolution is logged and counted. The resolution
+  is still served: observability does not reduce availability.
 
 ## Acceptance tests (against a real Resolver, as today's suites are)
 
