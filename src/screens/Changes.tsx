@@ -82,6 +82,47 @@ function Checks({ title, outcome, source, at, checks }: { title: string; outcome
   );
 }
 
+type Consumer = { principal: string; application?: string; environment?: string; instance?: string; registration?: string; resolvedRevision?: number; usedRevision?: number; usedOutcome?: string };
+
+export function Consumers({ list }: { list: Consumer[] }) {
+  return (
+    <ul className="list tight">
+      {list.map((x) => (
+        <li key={`${x.principal}/${x.instance ?? ""}`}>
+          <strong>{x.application ?? "unregistered"}</strong>
+          {x.instance && <span className="small muted"> {x.instance}</span>} <code className="small">{x.principal}</code>
+          {x.registration && <span className="chip">{x.registration}</span>}
+          {x.resolvedRevision !== undefined && <span className="small"> · resolved r{x.resolvedRevision}</span>}
+          {x.usedRevision !== undefined && <span className="small"> · reported using r{x.usedRevision} ({x.usedOutcome})</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type AdoptionDoc = NonNullable<NonNullable<ReturnType<typeof useQueryState<typeof api.changes.get>>["data"]>["change"]["adoption"]>;
+
+/** Resolver's adoption stages for the revision this change committed. Each keeps its basis; a notification is none of them. */
+function AdoptionCard({ adoption: a }: { adoption: AdoptionDoc | undefined }) {
+  if (!a) return <Card title="Adoption"><Empty title="Not read yet">The resolver component reads Resolver's adoption record for a day after verification (Resolver 0.4.0 or later).</Empty></Card>;
+  return (
+    <Card title="Adoption" subtitle={`Revision ${a.revision} · read from Resolver ${when(a.at)}`}>
+      <MetadataList
+        items={[
+          { label: <>Authorized <Basis kind="observed" /></>, value: a.authorized.mode === "authorized" ? <>change authorization <code>{a.authorized.jti}</code> from {a.authorized.issuer}, consumed {a.authorized.consumedAt}</> : a.authorized.mode },
+          { label: <>Committed <Basis kind="observed" /></>, value: a.committedAt },
+          { label: <>Available <Basis kind="observed" /></>, value: a.available.current ? "current: consumers resolving now get it" : `superseded${a.available.until ? ` at ${a.available.until}` : ""} (Resolver is at r${a.currentRevision})` },
+          { label: <>Fetched <Basis kind="observed" /></>, value: a.fetched.length ? <Consumers list={a.fetched} /> : "nobody has resolved it yet" },
+          { label: <>Not yet fetched <Basis kind="derived" /></>, value: a.notYetFetched.length ? <Consumers list={a.notYetFetched} /> : "no live registered consumer is behind" },
+          { label: <>Adopted <Basis kind="asserted" /></>, value: a.adopted.length ? <Consumers list={a.adopted} /> : "no consumer has reported using it" },
+          { label: <>Functionally verified <Basis kind="unknown" /></>, value: "No verifier exists: nothing checks that the new target works for consumers." },
+        ]}
+      />
+      <p className="small muted">A change notification reaching a consumer is not adoption: only a resolution shows a fetch, only a consumer's report shows use. Consumers that are not registered with Resolver appear only once they resolve.</p>
+    </Card>
+  );
+}
+
 export function ChangeDetail({ id }: { id: string }) {
   const app = useApp();
   const state = useQueryState(api.changes.get, { id });
@@ -146,6 +187,7 @@ export function ChangeDetail({ id }: { id: string }) {
                     { label: "Environment", value: <>{c.environment}{c.impact.protected && <span className="chip">protected</span>}</> },
                     { label: "Criticality", value: <><State field="resolver-control.dependency.criticality" value={c.impact.criticality} /> · <State field="resolver-control.dependency.change_class" value={c.impact.changeClass} /></> },
                     { label: <>Consumers <Basis kind="declared" /></>, value: c.impact.declaredConsumers.length ? c.impact.declaredConsumers.map((x) => x.application).join(", ") : "none declared" },
+                    { label: <>Consumers <Basis kind="observed" /></>, value: c.impact.observedConsumers === undefined ? "not read from Resolver" : c.impact.observedConsumers.length ? <Consumers list={c.impact.observedConsumers} /> : "none seen resolving" },
                     ...(c.impact.observedRelationships.length ? [{ label: <>Related <Basis kind="observed" /></>, value: <>{c.impact.observedRelationships.map((r) => <div key={r.ref}><Ref value={r.ref} /> <span className="small muted">{r.relation}</span></div>)}</> }] : []),
                     { label: "Fallback", value: c.impact.fallback },
                     { label: "Propagation", value: c.impact.propagation },
@@ -175,8 +217,9 @@ export function ChangeDetail({ id }: { id: string }) {
                     items={[
                       { label: "Started", value: exact(c.execution.claimedAt) },
                       ...(c.execution.finishedAt ? [{ label: "Finished", value: exact(c.execution.finishedAt) }] : []),
+                      ...(c.execution.authorization ? [{ label: "Authorization", value: <><code>{c.execution.authorization.jti}</code> <span className="small muted">issued {exact(c.execution.authorization.issuedAt)} by the approval signer, valid until {c.execution.authorization.expiresAt}</span></> }] : []),
                       ...(c.execution.resolverRevision !== undefined ? [{ label: "Resolver revision", value: String(c.execution.resolverRevision), mono: true }] : []),
-                      ...(c.execution.error ? [{ label: "Resolver said", value: <span className="error-text">{c.execution.error.code}{c.execution.error.reason && ` (${c.execution.error.reason})`}: {c.execution.error.message}</span> }] : []),
+                      ...(c.execution.error ? [{ label: c.execution.error.code.startsWith("SIGNER_") ? "Approval signer said" : "Resolver said", value: <span className="error-text">{c.execution.error.code}{c.execution.error.reason && ` (${c.execution.error.reason})`}: {c.execution.error.message}</span> }] : []),
                       ...(c.execution.note ? [{ label: "Note", value: c.execution.note }] : []),
                     ]}
                   />
@@ -194,6 +237,7 @@ export function ChangeDetail({ id }: { id: string }) {
               />
             )}
             {c.verification?.selected !== undefined && <details><summary className="small">What consumers resolve now</summary><Json value={c.verification.selected} /></details>}
+            {c.status === "verified" && <AdoptionCard adoption={c.adoption} />}
 
             <div className="row-actions">
               {mine && ["proposed", "ready", "approved", "invalid"].includes(c.status) && <Button label="Withdraw" variant="ghost" onClick={() => void attempt(app, () => cancel({ id: c.id }), "Withdrawn.")} />}

@@ -1,8 +1,11 @@
 # Governed execution: Resolver Control × Resolver 0.4.0
 
-Status: **design, before implementation.** Integrates this application with Resolver's mutation policies and
-observability (`@appport/resolver` 0.4.0, unpublished; its `docs/governance-guarantees.md`). The packages are
-published only after this application passes its integration tests against these exact builds.
+Status: **implemented and tested against the exact unpublished builds** of `@appport/resolver` 0.4.0,
+`@appport/resolver-client` 0.3.0 and `@appport/resolver-core` 0.2.0. They are vendored in `vendor/` as `npm pack`
+tarballs: sha256 `b8809d1e…`, `7bc76575…`, `f12a95d8…`, rebuilt from rkendel1/resolver `286183b` byte-identical. The
+design below was committed before the code; [What was built](#what-was-built) records where the implementation
+differs, and [Evidence](#evidence) what proves it. The packages are published (by their owner) only after this
+application passes against these exact builds. It does now (see Evidence).
 
 ## Responsibilities stay where they are
 
@@ -89,3 +92,95 @@ adopted, functionally verified (none yet). It never treats a notification as ado
 * lost answer after the write
 * Resolver unreachable after signing
 * adoption across a real consumer process
+
+## What was built
+
+| Part | Where |
+|---|---|
+| The signer: the decision rules above, claims derived from the record | `signer/core.ts` |
+| The signer as a process: `POST /sign` (Bearer client token), `GET /key`, `GET /ready`; reads this application over HTTP with its own session; decision logs carry ids, never tokens; `--generate` makes a key pair | `signer/server.ts`, `npm run signer` |
+| Role `signer` (`changes.read`, `activity.read`); `settings.signerUrl`; component credential `approval-signer-token` | `feltkit/app.ts`, `feltkit/settings.ts` |
+| Execution with an authorization, the outcomes above, reconciliation by `governance.decision`, the verification check "Authorized for this change" | `component/engine.ts` |
+| Issuance evidence (`execution.authorization`: jti and expiry, never the token; event `change.authorization_issued`) | `feltkit/changes.ts` `recordAuthorization` |
+| Adoption per verified change for 24 h (`changes.adoption`, events `change.revision_fetched` / `change.revision_adopted`, once per consumer) | `changes.ts` `recordAdoption`, engine `#adoption` |
+| Observed consumers per reference (every 30 s), in impact next to declared ones | `observations.ts` `recordConsumers`, `_rules.ts` `computeImpact` |
+| Break-glass revisions surfaced as `resolver.change.break_glass` | `observations.ts` `upsert` |
+| UI: authorization and signer refusals under Execution, an Adoption card with each stage's basis, observed consumers on the change and the dependency | `src/screens/Changes.tsx`, `Dependencies.tsx`, `Settings.tsx` |
+| `npm run demo -- --governed --consumer`: prod under a policy (Resolver's operator CLI), the signer, a registered consumer | `scripts/demo.mjs` |
+
+Where it differs from the design, or adds to it:
+
+* **No signer token, no claim.** With `signerUrl` set and no `approval-signer-token`, approved changes wait and the
+  tick reports why. Nothing is claimed or sent.
+* **Backoff.** After `SIGNER_UNAVAILABLE`, a change is not claimed again for 10 s.
+* **Claim age.** The signer refuses a claim older than 60 s (the lease).
+* **Consumed authorization.** `resolver.authorization-consumed` from Resolver is treated like a stale write:
+  settled from history.
+* **This component is not a consumer.** Resolver records this component's own reads (synchronization,
+  verification) as resolutions, and has no "who am I" (gap R9). So the component's live connection registers with
+  Resolver as consumer `resolver-control` / `control-plane`. Its principal is learned from that registration (or
+  from the actor on its own writes), kept in `syncStatus.principal`, and excluded from consumers and adoption.
+  Found by the UI walkthrough, then covered by a test.
+* **Fetched comes from resolutions, not notifications.** A live client's stream notification only invalidates its
+  cache, and the fetch happens on the application's next `resolve`. Adoption reflects exactly that. "Not yet
+  fetched" lists live registrations behind the revision.
+
+## Evidence
+
+`tests/governance.test.ts` runs against the real Resolver 0.4.0 enforcing a policy on `ref://prod/*` (in-process,
+its own install), the real signer over HTTP, and the engine as the component principal. 20 tests, all pass.
+`e2e/governed.test.mjs` runs every part as its own process: `resolver serve` with the policy and key set by
+`resolver policy set` / `resolver signing-key add`; `feltkit dev` with the component; `signer/server.ts`; a
+registered consumer. 1/1 passes.
+
+| Scenario | Shown by | Result |
+|---|---|---|
+| Approved change → authorization → Resolver verifies and consumes it → verified, with the check "Authorized for this change"; Resolver's revision names jti, decision and approvers | governance test 1; e2e | pass |
+| Governed rollback (revert) | governance 2 | pass |
+| Signer configured, token missing: nothing claimed | governance 3 | pass |
+| Signer refuses: out of scope; below its approval floor; not executing; wrong attempt; unauthenticated; unknown change. Extra request fields are ignored: the claims match the record | governance 4 (3 subtests) | pass; Resolver unchanged |
+| Tampered record (approval without an audit event; approval event not by a person; self-approval) refused | governance 4 | pass; mutation check: dropping the audit cross-check fails it |
+| Expired authorization (signer clock 10 min behind) | governance 5 | Resolver `authorization-invalid` (expired); failed; unchanged |
+| Revoked signing key | governance 6 | Resolver `authorization-invalid`; failed; unchanged |
+| Signer down, then back: requeued under the same approval, backoff, then attempt 2 executes once | governance 7 | pass; one write |
+| Signer cannot read this application (503) | governance 8 | requeued, then verified |
+| Concurrent approvals (two required) | governance 9 | approved once, both approvers in Resolver's record |
+| Two executors at once | governance 10 | one revision, one authorization consumed |
+| Stale revision (operator break-glass after approval) | governance 11 | superseded; break-glass surfaced |
+| Lost answer after the governed write | governance 12 | reconciled by Resolver's governance record; verified with attempt 1's jti |
+| Resolver unreachable after signing | governance 13 | requeued; attempt 3 re-signed and written; the jti of attempt 1 never consumed |
+| Adoption: fetched (observed) ≠ notified; adopted (asserted) ≠ fetched; idle instance not yet fetched; this component excluded even before its first write | governance 14 | pass; mutation check: without self-exclusion it fails |
+| Consumer facts survive a new revision | governance 15 | pass; mutation check: without the fix it fails |
+| Signer core: attempt mismatch, expired claim, secret put not signable; `GET /key` matches the registered key | governance 16 | pass |
+| Private key never in the application's output; tokens never in records, audit or signer logs | e2e; governance 1 | pass |
+| The artifact declares `approval-signer-token`, and no signing key anywhere | `npm run test:artifact` | pass |
+
+## Guarantees and limits
+
+**Guaranteed (by Resolver, given the policy):**
+
+* No write to a governed reference without an authorization from a trusted key, bound to the tenant, reference,
+  operation, expected revision and binding digest, and consumed once with the revision.
+* Operator break-glass is the only exception, and it is recorded.
+
+**Guaranteed by this integration:**
+
+* This application holds no signing key.
+* The signer signs only a change that its record shows validated, approved by enough distinct people (none of them
+  the proposer, each backed by a person's audit event), and being executed now by the executor. Every claim comes
+  from that record.
+
+**Not guaranteed:**
+
+* **The signer trusts this application's records.** An administrator of this application's FeltDB could forge an
+  approved change with matching audit events. Closing that needs approvals signed by the approvers' own keys. Not
+  built.
+* **One signer, no high availability.** An outage holds approved changes; nothing executes without it. Key
+  rotation is Resolver's (retire, then add) plus a restart of the signer with the new key. Rotation was not
+  exercised end to end here (Resolver's own tests cover retire/revoke semantics).
+* **The signer runs from a checkout** (`node --import tsx`). It is not packaged or deployed anywhere; no AppBoundry
+  or FeltKit target runs it.
+* **Adoption is only as good as consumers' cooperation.** Unregistered consumers appear only once they resolve.
+  `adopted` is what consumers report. `functionallyVerified` has no producer.
+* **Not exercised:** multi-host FeltDB for Resolver, Resolver's MCP and management pages for governed writes (as
+  stated for Resolver 0.4.0), and the AppBoundry companion on a real host (gap A1).

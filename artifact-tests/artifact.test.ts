@@ -22,7 +22,9 @@ test("the artifact: no network in the guest, the Resolver key only in the compon
   assert.equal(manifest.permissions.network, "none");
   assert.equal(manifest.permissions.filesystem, "none");
   const component = manifest.components.find((c: { name: string }) => c.name === "resolver");
-  assert.deepEqual(component.credentials, ["resolver-api-key"]);
+  // The Resolver key, and the token presented to the approval signer. Never the signing key: it is the signer's alone.
+  assert.deepEqual(component.credentials, ["resolver-api-key", "approval-signer-token"]);
+  assert.ok(!/signing-key|private-key/.test(JSON.stringify(manifest)), "no signing key is declared anywhere in the artifact");
   assert.equal(component.network, "egress");
   assert.deepEqual(component.principal, { id: "component:resolver", roles: ["executor"] });
   assert.ok(!JSON.stringify(manifest).includes("sk-"), "no credential material in the manifest");

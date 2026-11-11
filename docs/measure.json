@@ -22,15 +22,15 @@
   "totals": {
     "domain": {
       "files": 12,
-      "lines": 1473
+      "lines": 1597
     },
     "experience": {
       "files": 14,
-      "lines": 1539
+      "lines": 1604
     },
     "infrastructure": {
-      "files": 4,
-      "lines": 627
+      "files": 6,
+      "lines": 1060
     },
     "generated": {
       "files": 1,
@@ -38,11 +38,11 @@
     },
     "configuration": {
       "files": 5,
-      "lines": 84
+      "lines": 109
     },
     "tests": {
-      "files": 9,
-      "lines": 787
+      "files": 12,
+      "lines": 1461
     },
     "third-party": {
       "files": 0,
@@ -53,8 +53,8 @@
       "lines": 0
     },
     "excluded": {
-      "files": 9,
-      "lines": 4352
+      "files": 13,
+      "lines": 4362
     },
     "unclassified": {
       "files": 0,
@@ -62,14 +62,14 @@
     }
   },
   "authored": {
-    "files": 35,
-    "lines": 3723
+    "files": 37,
+    "lines": 4370
   },
   "definitions": {
     "app": {
       "auditTrail": 1,
       "collection": 8,
-      "mutation": 25,
+      "mutation": 28,
       "query": 14
     },
     "collections": [
@@ -86,22 +86,22 @@
   "consumption": [
     {
       "api": "@feltdb/feltkit s",
-      "callSites": 583,
+      "callSites": 674,
       "files": 11
     },
     {
       "api": "ctx.db",
-      "callSites": 110,
+      "callSites": 116,
       "files": 9
     },
     {
       "api": "@feltdb/feltkit fail",
-      "callSites": 54,
+      "callSites": 57,
       "files": 5
     },
     {
       "api": "@feltdb/feltkit/react useQueryState",
-      "callSites": 21,
+      "callSites": 22,
       "files": 10
     },
     {
@@ -121,8 +121,13 @@
     },
     {
       "api": "@feltdb/feltkit/testing createTestApp",
+      "callSites": 5,
+      "files": 4
+    },
+    {
+      "api": "@feltdb/feltkit/testing TestApp",
       "callSites": 4,
-      "files": 3
+      "files": 2
     },
     {
       "api": "@feltdb/feltkit QueryCtx",
@@ -141,11 +146,6 @@
     },
     {
       "api": "@feltdb/feltkit/react FeltKitProvider",
-      "callSites": 2,
-      "files": 1
-    },
-    {
-      "api": "@feltdb/feltkit/testing TestApp",
       "callSites": 2,
       "files": 1
     },
@@ -190,7 +190,17 @@
       "files": 1
     }
   ],
-  "findings": [],
+  "findings": [
+    {
+      "id": "http-server",
+      "title": "App-built HTTP server",
+      "file": "signer/server.ts",
+      "line": 109,
+      "evidence": "const server = createServer((req, res) => void handle(req, res).catch((error) => send(res, 500, { reason: \"signer.error\", message: (error as Error).message })))",
+      "platform": "FeltKit serves every function over HTTP with authorization (app.query/mutation/action)",
+      "acknowledged": "The approval signer must not run as this application's functions or component: it holds the signing key and must stay outside the trust boundary of the application it checks. A stateless HTTP endpoint (POST /sign) in its own process is the smallest form. See docs/AUTHORIZATION-INTEGRATION.md."
+    }
+  ],
   "checks": [
     {
       "name": "generated code current",
@@ -201,7 +211,7 @@
     {
       "name": "declarations match files",
       "ok": true,
-      "detail": "3 declaration(s), each matches a file",
+      "detail": "4 declaration(s), each matches a file",
       "fix": "Remove or correct the stale entries in feltkit.measure.json."
     },
     {
@@ -209,6 +219,12 @@
       "ok": true,
       "detail": "every file with code has a class",
       "fix": "Declare them in feltkit.measure.json with a class and a reason."
+    },
+    {
+      "name": "acknowledged findings still exist",
+      "ok": true,
+      "detail": "1 acknowledged finding(s), each still present",
+      "fix": "Remove the resolved entries from \"acknowledged\" in feltkit.measure.json."
     }
   ],
   "files": [
@@ -228,22 +244,28 @@
       "path": "artifact-tests/artifact.test.ts",
       "class": "tests",
       "basis": "declared: Runs the change lifecycle through the compiled AppBoundry artifact.",
-      "lines": 53
+      "lines": 54
     },
     {
       "path": "component/engine.ts",
       "class": "infrastructure",
       "basis": "declared: The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key.",
-      "lines": 329
+      "lines": 479
     },
     {
       "path": "component/resolver.ts",
       "class": "infrastructure",
       "basis": "declared: The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key.",
-      "lines": 65
+      "lines": 66
     },
     {
       "path": "docs/ARCHITECTURE.md",
+      "class": "excluded",
+      "basis": "documentation",
+      "lines": 0
+    },
+    {
+      "path": "docs/AUTHORIZATION-INTEGRATION.md",
       "class": "excluded",
       "basis": "documentation",
       "lines": 0
@@ -267,22 +289,34 @@
       "lines": 0
     },
     {
+      "path": "e2e/governed.test.mjs",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 106
+    },
+    {
+      "path": "e2e/harness.mjs",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 31
+    },
+    {
       "path": "e2e/processes.test.mjs",
       "class": "tests",
       "basis": "path: tests",
-      "lines": 114
+      "lines": 88
     },
     {
       "path": "examples/consumer-app.mjs",
       "class": "tests",
       "basis": "declared: A consuming application used by the e2e to prove a running consumer follows a governed change without restart.",
-      "lines": 32
+      "lines": 41
     },
     {
       "path": "feltkit.measure.json",
       "class": "configuration",
       "basis": "configuration file",
-      "lines": 8
+      "lines": 28
     },
     {
       "path": "feltkit/_audit.ts",
@@ -300,7 +334,7 @@
       "path": "feltkit/_rules.ts",
       "class": "domain",
       "basis": "path: feltkit/ (server functions)",
-      "lines": 184
+      "lines": 209
     },
     {
       "path": "feltkit/activity.ts",
@@ -312,7 +346,7 @@
       "path": "feltkit/app.ts",
       "class": "domain",
       "basis": "path: feltkit/ (server functions)",
-      "lines": 204
+      "lines": 248
     },
     {
       "path": "feltkit/catalog.ts",
@@ -324,7 +358,7 @@
       "path": "feltkit/changes.ts",
       "class": "domain",
       "basis": "path: feltkit/ (server functions)",
-      "lines": 390
+      "lines": 425
     },
     {
       "path": "feltkit/demo.ts",
@@ -348,7 +382,7 @@
       "path": "feltkit/observations.ts",
       "class": "domain",
       "basis": "path: feltkit/ (server functions)",
-      "lines": 77
+      "lines": 93
     },
     {
       "path": "feltkit/policies.ts",
@@ -360,7 +394,7 @@
       "path": "feltkit/settings.ts",
       "class": "domain",
       "basis": "path: feltkit/ (server functions)",
-      "lines": 50
+      "lines": 54
     },
     {
       "path": "index.html",
@@ -372,13 +406,13 @@
       "path": "package-lock.json",
       "class": "excluded",
       "basis": "lockfile",
-      "lines": 4352
+      "lines": 4362
     },
     {
       "path": "package.json",
       "class": "configuration",
       "basis": "configuration file",
-      "lines": 40
+      "lines": 45
     },
     {
       "path": "public/apple-touch-icon.png",
@@ -402,13 +436,25 @@
       "path": "scripts/demo.mjs",
       "class": "infrastructure",
       "basis": "path: scripts/ (app tooling)",
-      "lines": 69
+      "lines": 100
     },
     {
       "path": "scripts/discover.mjs",
       "class": "infrastructure",
       "basis": "path: scripts/ (app tooling)",
       "lines": 164
+    },
+    {
+      "path": "signer/core.ts",
+      "class": "infrastructure",
+      "basis": "declared: The approval signer: a separate process that holds the change-authorization signing key, reads a change through this application as its own read-only principal, and signs only approved changes. Kept out of the application and its component by design (docs/AUTHORIZATION-INTEGRATION.md).",
+      "lines": 119
+    },
+    {
+      "path": "signer/server.ts",
+      "class": "infrastructure",
+      "basis": "declared: The approval signer: a separate process that holds the change-authorization signing key, reads a change through this application as its own read-only principal, and signs only approved changes. Kept out of the application and its component by design (docs/AUTHORIZATION-INTEGRATION.md).",
+      "lines": 132
     },
     {
       "path": "src/App.tsx",
@@ -438,13 +484,13 @@
       "path": "src/screens/Changes.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 213
+      "lines": 252
     },
     {
       "path": "src/screens/Dependencies.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 436
+      "lines": 451
     },
     {
       "path": "src/screens/Discovery.tsx",
@@ -474,19 +520,19 @@
       "path": "src/screens/Settings.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 69
+      "lines": 74
     },
     {
       "path": "src/styles.css",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 107
+      "lines": 108
     },
     {
       "path": "src/ui.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 186
+      "lines": 191
     },
     {
       "path": "tests/agents.test.ts",
@@ -510,13 +556,19 @@
       "path": "tests/fixtures/resolver-service.mjs",
       "class": "tests",
       "basis": "path: tests",
-      "lines": 33
+      "lines": 34
+    },
+    {
+      "path": "tests/governance.test.ts",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 549
     },
     {
       "path": "tests/helpers.ts",
       "class": "tests",
       "basis": "path: tests",
-      "lines": 75
+      "lines": 78
     },
     {
       "path": "tests/lifecycle.test.ts",
@@ -529,6 +581,24 @@
       "class": "configuration",
       "basis": "configuration file",
       "lines": 16
+    },
+    {
+      "path": "vendor/appport-resolver-0.4.0.tgz",
+      "class": "excluded",
+      "basis": "asset",
+      "lines": 0
+    },
+    {
+      "path": "vendor/appport-resolver-client-0.3.0.tgz",
+      "class": "excluded",
+      "basis": "asset",
+      "lines": 0
+    },
+    {
+      "path": "vendor/appport-resolver-core-0.2.0.tgz",
+      "class": "excluded",
+      "basis": "asset",
+      "lines": 0
     },
     {
       "path": "vite.config.ts",

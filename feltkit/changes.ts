@@ -12,7 +12,7 @@
  * carries the change's correlation tag in its reason, so Resolver's own history names the change.
  */
 import { fail, s, type MutationCtx, type QueryCtx } from "@feltdb/feltkit";
-import { app, changes, Check, consumers, dependencies, KINDS, observations, policies } from "./app.js";
+import { Adoption, app, changes, Check, consumers, dependencies, Governance, KINDS, observations, policies } from "./app.js";
 import { record } from "./_audit.js";
 import { bindingTargets, computeImpact, effectivePolicy, parseRef, refIn, requiredApprovals, type WeightedTarget } from "./_rules.js";
 
@@ -20,6 +20,8 @@ const Change = s.doc(changes);
 const OPEN = ["proposed", "ready", "approved", "executing", "unknown"] as const;
 /** How long an execution claim is honoured before the component reconciles it from Resolver's history. */
 export const LEASE_MS = 60_000;
+/** How long after verification the component keeps reading Resolver's adoption of a change's revision. */
+export const ADOPTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -106,6 +108,7 @@ async function propose(ctx: MutationCtx, p: Proposal) {
     current: current ? { revision: current.revision, strategy: current.strategy, targets: current.targets as WeightedTarget[], ttlSeconds: current.ttlSeconds, observedAt: current.observedAt } : null,
     next,
     consumers: declared,
+    observedConsumers: current?.observedConsumers ?? null,
     dependents,
     now: Date.now(),
   });
@@ -302,7 +305,7 @@ export const cancel = app.mutation({
 /** What the component should do now: validate proposals, execute approved changes, reconcile unsettled ones. */
 export const work = app.query({
   access: "changes.execute",
-  returns: s.object({ validate: s.array(Change), execute: s.array(Change), reconcile: s.array(Change), stale: s.array(s.object({ id: s.string(), currentRevision: s.integer() })) }),
+  returns: s.object({ validate: s.array(Change), execute: s.array(Change), reconcile: s.array(Change), adopt: s.array(Change), stale: s.array(s.object({ id: s.string(), currentRevision: s.integer() })) }),
   handler: async (ctx) => {
     const now = Date.now();
     const approved = await ctx.db.find(changes, { status: "approved" }, { orderBy: [{ field: "number", direction: "asc" }] });
@@ -323,6 +326,10 @@ export const work = app.query({
       validate: await ctx.db.find(changes, { status: "proposed" }, { orderBy: [{ field: "number", direction: "asc" }] }),
       execute,
       reconcile: [...executing.filter((c) => now - (c.execution?.claimedAt ?? 0) > LEASE_MS), ...(await ctx.db.find(changes, { status: "unknown" }))],
+      // Verified within the adoption window: the component reads Resolver's adoption of their revisions.
+      adopt: (await ctx.db.find(changes, { status: "verified" }, { orderBy: [{ field: "number", direction: "desc" }], limit: 200 }))
+        .filter((c) => c.execution?.resolverRevision !== undefined && now - (c.execution?.finishedAt ?? 0) < ADOPTION_WINDOW_MS)
+        .slice(0, 25),
     };
   },
 });
@@ -398,6 +405,43 @@ const Verification = s.object({
   bindingMatches: s.boolean(),
   selected: s.optional(s.unknown()),
   checks: s.array(Check),
+  governance: s.optional(Governance),
+});
+
+/**
+ * The approval signer issued a change authorization for the current attempt: its id and expiry are kept as
+ * evidence (never the token). Fenced like settle.
+ */
+export const recordAuthorization = app.mutation({
+  access: "changes.execute",
+  args: { id: s.string(), attempt: s.integer({ minimum: 1 }), jti: s.string({ maxLength: 200 }), expiresAt: s.string({ maxLength: 40 }) },
+  returns: Change,
+  handler: async (ctx, { id, attempt, jti, expiresAt }) => {
+    const change = await load(ctx, id);
+    if (change.status !== "executing" || change.execution?.attempt !== attempt) {
+      fail("CONFLICT", `CHG-${change.number} is no longer held by attempt ${attempt} (${change.status}, attempt ${change.execution?.attempt ?? 0}).`);
+    }
+    await ctx.db.patch(changes, id, { execution: { ...change.execution!, authorization: { jti, expiresAt, issuedAt: Date.now() } }, updatedAt: Date.now() });
+    await record(ctx, "change", id, "change.authorization_issued", { number: change.number, attempt, jti, expiresAt });
+    return (await ctx.db.get(changes, id))!;
+  },
+});
+
+/** Resolver's adoption of a verified change's revision. A projection, refreshed; transitions are audited. */
+export const recordAdoption = app.mutation({
+  access: "changes.execute",
+  args: { id: s.string(), adoption: Adoption },
+  returns: s.null(),
+  handler: async (ctx, { id, adoption }) => {
+    const change = await load(ctx, id);
+    if (change.status !== "verified" || change.execution?.resolverRevision !== adoption.revision) fail("FAILED_PRECONDITION", `CHG-${change.number} did not commit revision ${adoption.revision}.`);
+    const key = (c: { principal: string; instance?: string | undefined }) => `${c.principal}/${c.instance ?? ""}`;
+    const before = { fetched: new Set((change.adoption?.fetched ?? []).map(key)), adopted: new Set((change.adoption?.adopted ?? []).map(key)) };
+    await ctx.db.patch(changes, id, { adoption, updatedAt: Date.now() });
+    for (const c of adoption.fetched) if (!before.fetched.has(key(c))) await record(ctx, "change", id, "change.revision_fetched", { number: change.number, revision: adoption.revision, principal: c.principal, application: c.application ?? null, basis: "observed" });
+    for (const c of adoption.adopted) if (!before.adopted.has(key(c))) await record(ctx, "change", id, "change.revision_adopted", { number: change.number, revision: adoption.revision, principal: c.principal, application: c.application ?? null, basis: "asserted" });
+    return null;
+  },
 });
 
 /** The outcome of an execution attempt, with Resolver's evidence. Fenced: only the current attempt may settle. */

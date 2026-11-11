@@ -77,7 +77,7 @@ export async function seedResolver(admin: ResolverClient) {
 }
 
 /** Binds the engine to any test host (FeltKit runtime or the compiled artifact) as the component principal. */
-export function engineFor(t: { as(who: string | PrincipalInput): Caller }, resolver: { url: string; executorKey: string }, options: { connect?: Connect } = {}) {
+export function engineFor(t: { as(who: string | PrincipalInput): Caller }, resolver: { url: string; executorKey: string }, options: { connect?: Connect; signerToken?: string; now?: () => number; consumersIntervalMs?: number } = {}) {
   const caller = t.as(EXECUTOR);
   return new ResolverEngine({
     call: (name, args) => {
@@ -86,6 +86,9 @@ export function engineFor(t: { as(who: string | PrincipalInput): Caller }, resol
     },
     apiKey: async () => resolver.executorKey,
     ...(options.connect ? { connect: options.connect } : {}),
+    ...(options.signerToken ? { signerToken: async () => options.signerToken! } : {}),
+    ...(options.now ? { now: options.now } : {}),
+    ...(options.consumersIntervalMs !== undefined ? { consumersIntervalMs: options.consumersIntervalMs } : {}),
   });
 }
 

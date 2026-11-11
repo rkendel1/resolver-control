@@ -282,7 +282,7 @@ test("separation of duties holds even for a person allowed to both propose and a
   }
 });
 
-test("under a Resolver mutation policy this application cannot satisfy yet, an approved change fails honestly and the reference is unchanged", async (t) => {
+test("with no approval signer configured, under a Resolver mutation policy an approved change fails safely and the reference is unchanged", async (t) => {
   const { resolver, t: app } = await setup();
   const runtime = (resolver as unknown as { runtime?: { resolver: { setPolicy?: unknown } } }).runtime;
   if (!runtime || typeof runtime.resolver.setPolicy !== "function") {

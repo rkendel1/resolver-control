@@ -1,7 +1,7 @@
 /**
  * The `resolver` component: runs the engine on a loop, sooner when Resolver streams a change.
  * Declared in feltkit/app.ts (`components.resolver`): principal `component:resolver` with the
- * `executor` role, credential `resolver-api-key`, network egress. Under `feltkit dev|start` it runs
+ * `executor` role, credentials `resolver-api-key` and (optional) `approval-signer-token`, network egress. Under `feltkit dev|start` it runs
  * in the application's process; in an AppBoundry artifact, beside the guest (components@1).
  */
 import { defineComponent, type ComponentHealth } from "@feltdb/feltkit/server";
@@ -18,6 +18,7 @@ export default defineComponent(async (ctx) => {
   const engine = new ResolverEngine({
     call: (name, args) => ctx.call(name, args ?? {}),
     apiKey: () => ctx.credential("resolver-api-key"),
+    signerToken: () => ctx.credential("approval-signer-token"),
     log: ctx.log,
     onRemoteChange: () => schedule(250),
   });
@@ -35,7 +36,7 @@ export default defineComponent(async (ctx) => {
       interval = (settings?.syncIntervalSeconds ?? 5) * 1000;
       if (report.state !== "ok") ctx.log.warn(`resolver: ${report.state}${report.detail ? `: ${report.detail}` : ""}`);
     } catch (error) {
-      last = { state: "error", detail: (error as Error).message, observed: 0, validated: 0, executed: 0, reconciled: 0, at: Date.now() };
+      last = { state: "error", detail: (error as Error).message, observed: 0, validated: 0, executed: 0, reconciled: 0, adoption: 0, at: Date.now() };
       ctx.log.error(`resolver: tick failed: ${(error as Error).message}`);
     } finally {
       running = false;

@@ -71,9 +71,10 @@ export function State({ field, value, label, detail }: { field: string; value: s
 }
 
 /** Where a fact came from. Every fact on screen carries one. (Stack has freshness, not provenance: proposed upstream.) */
-export function Basis({ kind }: { kind: "observed" | "declared" | "derived" | "unknown" }) {
+export function Basis({ kind }: { kind: "observed" | "declared" | "derived" | "asserted" | "unknown" }) {
   const title = {
     observed: "Read from Resolver by the resolver component, at the revision and time shown",
+    asserted: "Reported to Resolver by the consuming application itself; Resolver records it, nobody verifies it",
     declared: "Recorded by a person, an agent or a consuming application; not verified against running systems",
     derived: "Computed by a deterministic rule from observed and declared facts",
     unknown: "Not known: no source reports it",
@@ -201,7 +202,10 @@ export const EVENT_LABEL: Record<string, string> = {
   "change.execution_started": "Execution started",
   "change.reconciliation_started": "Reconciling from Resolver's history",
   "change.verified": "Executed and verified",
-  "change.failed": "Resolver refused it",
+  "change.failed": "Refused: did not execute",
+  "change.authorization_issued": "Authorization issued by the approval signer",
+  "change.revision_fetched": "A consumer fetched the new revision",
+  "change.revision_adopted": "A consumer reported using the new revision",
   "change.unknown": "Outcome unknown",
   "change.requeued": "Not applied; queued again",
   "dependency.registered": "Dependency registered",
@@ -209,6 +213,7 @@ export const EVENT_LABEL: Record<string, string> = {
   "consumer.declared": "Consumer declared",
   "consumer.removed": "Consumer removed",
   "resolver.change.out_of_band": "Changed directly in Resolver",
+  "resolver.change.break_glass": "Operator break-glass write in Resolver",
   "resolver.reference.not_visible": "No longer visible to the executor",
   "policy.changed": "Policy changed",
   "policy.frozen": "Environment frozen",

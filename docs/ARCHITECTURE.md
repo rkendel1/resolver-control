@@ -1,8 +1,10 @@
 # Architecture and integration map
 
 Resolver Control governs the runtime dependencies applications resolve through
-[Resolver](https://www.npmjs.com/package/@appport/resolver) (`@appport/resolver` 0.3.3). It is a
-FeltKit 0.3.24 application, buildable as an immutable AppBoundry artifact.
+[Resolver](https://www.npmjs.com/package/@appport/resolver) (`@appport/resolver` 0.4.0, unpublished, vendored in
+`vendor/`). It is a FeltKit 0.3.25 application, buildable as an immutable AppBoundry artifact. Under a Resolver
+mutation policy, its writes carry change authorizations from the **approval signer** (`signer/`), a separate process
+([AUTHORIZATION-INTEGRATION.md](AUTHORIZATION-INTEGRATION.md)).
 
 ## The one rule: who owns what
 
@@ -12,6 +14,8 @@ FeltKit 0.3.24 application, buildable as an immutable AppBoundry artifact.
 | `observations`: what Resolver answered, at which revision, when | Resolver (projected) | A read-only projection for display and impact analysis. It is never the basis of a write: Resolver rejects a stale write. Each row carries `revision` and `observedAt`. |
 | Owner, criticality, change class, contract (`dependencies`); declared consumers (`consumers`); `policies`; `changes` (proposal, impact, validation, approvals, execution, verification); `candidates`; `events` | **This application** (FeltDB) | FeltKit functions, transactional, each with an audit event in the same transaction. |
 | The Resolver API key | Host secret store (FeltKit credential custody: `FELTKIT_CREDENTIAL_RESOLVER_API_KEY`; AppBoundry: the operator's secret file) | Declared by the component (`credentials: ["resolver-api-key"]`), read only by it, never written to state, logs or records. |
+| The change-authorization signing key (Ed25519) | **The approval signer** (`signer/`, its own process; its public key is registered with Resolver by Resolver's host operator) | Never here. The component presents `approval-signer-token` and names a change. The signer reads that change as principal role `signer` (read only) and signs claims derived from the record. |
+| Who resolves a reference, and adoption of a revision | **Resolver** (0.4.0: resolution records observed, usage reports asserted) | Read by the component into `observations.observedConsumers` and `changes.adoption`, each with its basis. This component's own reads are excluded. |
 | Secret material | Resolver's vault | Never read. The executor key has no `reveal` grant. Rollbacks of a secret restore a custody pointer. |
 
 There is no second store, second permission system or second vault.
@@ -91,11 +95,13 @@ What the build relies on, classified from the code (not the docs) of each reposi
 | Capability needed | Where | Status | Used as |
 |---|---|---|---|
 | Named references, kinds, bindings, steering | Resolver `@appport/resolver-core` | **Exists, usable** | Data model; `checkBinding` reused for validation and verification |
-| List, resolve (incl. pinned), history, put/rollback with `expectedRevision`, watch | Resolver capabilities via `@appport/resolver-client` 0.2.4 | **Exists, usable** | Component; history is oldest-first with `limit` keeping the newest |
+| List, resolve (incl. pinned), history, put/rollback with `expectedRevision`, watch | Resolver capabilities via `@appport/resolver-client` 0.3.0 | **Exists, usable** | Component; history is oldest-first with `limit` keeping the newest |
+| Mutation policies, change authorizations, break-glass, governance on history | Resolver 0.4.0 (unpublished) | **Exists, used** | Writes carry the signer's authorization; verification checks it; break-glass is surfaced |
+| Consumer registration, resolution records, usage reports, adoption | Resolver 0.4.0 (unpublished) | **Exists, used** | Observed consumers in impact; adoption per change; the component registers itself so its own reads are excluded (gap R9) |
 | Grants per key and pattern | Resolver | **Exists, usable** | Environment boundary for the executor key (proven: a key without `write` on prod fails the change) |
 | Revision history with actor and reason | Resolver | **Exists** (not tamper-evident: Resolver's README) | Verification and correlation |
-| Dry-run validation, consumer usage, readable value schemas, approval enforcement | Resolver | **Missing** | Gaps R1–R4 (docs/PLATFORM-GAPS.md) |
-| App model, transactions, sequences, roles, `authorize`, live queries, audit | FeltKit 0.3.24 | **Exists, usable** | Everything in `feltkit/` |
+| Dry-run validation, readable value schemas, "who am I" | Resolver | **Missing** | Gaps R2, R3, R9 (docs/PLATFORM-GAPS.md) |
+| App model, transactions, sequences, roles, `authorize`, live queries, audit | FeltKit 0.3.25 | **Exists, usable** | Everything in `feltkit/` |
 | Capabilities published over AppPort and MCP | FeltKit + AppPort | **Exists, usable** | 30 capabilities; agents use MCP (e2e) |
 | Components with declared credential, egress and principal | FeltKit `components` | **Exists, usable** under `feltkit dev/start` | The Resolver executor (e2e) |
 | Components in an artifact (`components@1`) | AppBoundry | **Partially implemented**: tested locally, gate off, image and runtime unpublished | Built into `resolver-control.app`; not deployed (gap A1) |

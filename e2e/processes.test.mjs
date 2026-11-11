@@ -10,41 +10,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { resolverService } from "../tests/fixtures/resolver-service.mjs";
-
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const children = [];
-
-function run(command, args, options) {
-  const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
-  child.output = "";
-  child.stdout.on("data", (d) => (child.output += d));
-  child.stderr.on("data", (d) => (child.output += d));
-  children.push(child);
-  return child;
-}
-
-async function until(what, check, ms = 30_000) {
-  const deadline = Date.now() + ms;
-  let last;
-  while (Date.now() < deadline) {
-    try {
-      last = await check();
-      if (last) return last;
-    } catch (error) {
-      last = error;
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error(`timed out waiting for ${what}: ${last instanceof Error ? last.message : JSON.stringify(last)}`);
-}
-
-const port = () => 41000 + Math.floor(Math.random() * 9000);
+import { ROOT, port, run, stopAll, until } from "./harness.mjs";
 
 test("a deployed consumer follows a governed change made through Resolver Control, across real processes", { timeout: 180_000 }, async () => {
   const { cli } = resolverService();
@@ -138,7 +109,6 @@ test("a deployed consumer follows a governed change made through Resolver Contro
     console.log(`evidence: ${join(work, "evidence.json")}`);
     void resolverProcess;
   } finally {
-    for (const child of children.reverse()) child.kill("SIGTERM");
-    await new Promise((r) => setTimeout(r, 500));
+    await stopAll();
   }
 });

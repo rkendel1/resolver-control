@@ -12,11 +12,13 @@ export function Settings() {
   const [url, setUrl] = useState("");
   const [namespaces, setNamespaces] = useState("dev, staging, prod");
   const [interval, setInterval_] = useState("5");
+  const [signer, setSigner] = useState("");
   useEffect(() => {
     if (state.data?.settings) {
       setUrl(state.data.settings.resolverUrl);
       setNamespaces(state.data.settings.namespaces.join(", "));
       setInterval_(String(state.data.settings.syncIntervalSeconds));
+      setSigner(state.data.settings.signerUrl ?? "");
     }
   }, [state.data?.settings]);
   const writable = can(app.permissions, "settings.write");
@@ -31,11 +33,12 @@ export function Settings() {
                 <Form
                   label="Resolver connection"
                   submitLabel="Save"
-                  onSubmit={() => void attempt(app, () => save({ resolverUrl: url, namespaces: namespaces.split(/[\s,]+/).filter(Boolean), syncIntervalSeconds: Number(interval) }), "Saved. The resolver component uses it on its next pass.")}
+                  onSubmit={() => void attempt(app, () => save({ resolverUrl: url, namespaces: namespaces.split(/[\s,]+/).filter(Boolean), syncIntervalSeconds: Number(interval), signerUrl: signer.trim() || null }), "Saved. The resolver component uses it on its next pass.")}
                 >
                   <TextField name="resolver-origin" label="Resolver origin" placeholder="https://resolver.internal.example.com" value={url} onChange={setUrl} required />
                   <TextField name="environments-namespaces" label="Environments (namespaces)" hint="Comma-separated" value={namespaces} onChange={setNamespaces} required />
                   <TextField name="sync-interval-seconds" label="Sync interval (seconds)" type="number" min={1} max={3600} value={interval} onChange={setInterval_} />
+                  <TextField name="approval-signer-origin" label="Approval signer origin" hint="Empty: writes carry no change authorization (enough where Resolver has no mutation policy)" placeholder="http://127.0.0.1:8790" value={signer} onChange={setSigner} />
                 </Form>
               ) : (
                 <MetadataList
@@ -43,6 +46,7 @@ export function Settings() {
                     { label: "Resolver origin", value: settings?.resolverUrl ?? null, mono: true },
                     { label: "Environments", value: settings?.namespaces.join(", ") ?? null },
                     { label: "Sync interval", value: settings ? `${settings.syncIntervalSeconds} s` : null },
+                    { label: "Approval signer", value: settings?.signerUrl ?? "none", mono: true },
                   ]}
                 />
               )}
@@ -53,6 +57,7 @@ export function Settings() {
                 items={[
                   { label: "Last report", value: sync ? <><State field="resolver-control.sync.state" value={sync.state} detail={`${exact(sync.at)} · ${sync.references} references`} />{sync.detail && <div className="small">{sync.detail}</div>}</> : "None yet" },
                   { label: "API key", value: <>The component credential <code>resolver-api-key</code>: <code>FELTKIT_CREDENTIAL_RESOLVER_API_KEY</code> under FeltKit, or the host's secret file under AppBoundry. It is never stored in this application's data and never shown here.</> },
+                  { label: "Change authorizations", value: <>Where Resolver governs a reference with a mutation policy, each write carries an authorization signed by the <strong>approval signer</strong> (<code>signer/</code>, its own process). It holds the signing key; this application never does. The component presents the credential <code>approval-signer-token</code> and names a change; the signer reads that change here as its own read-only principal (role <code>signer</code>) and signs only what people approved.</> },
                   { label: "Key's grants", value: <>Create it in Resolver with <code>read</code> on every managed namespace and <code>write</code> only where this application may execute changes, e.g. <code>resolver keys create resolver-control --grant read,write:ref://staging/* --grant read,write:ref://prod/*</code>. Resolver enforces them on every write.</> },
                 ]}
               />

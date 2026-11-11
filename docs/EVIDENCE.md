@@ -8,8 +8,9 @@ names the test or command that shows it. Numbers are from the last full run (202
 | Check | Command | Result |
 |---|---|---|
 | Types (backend, component, frontend, tests) | `npm run typecheck` | clean |
-| Unit and integration tests, against the **real** Resolver (`@appport/resolver` 0.3.3 from npm, run in-process as its own install) | `npm test` | 12/12 pass |
-| Multi-process e2e: Resolver's own CLI (`init`, `serve`, `keys`, `set`), `feltkit dev` running the component, a separate consumer process, people over HTTP, an agent over MCP | `npm run test:e2e` | 1/1 pass |
+| Unit and integration tests, against the **real** Resolver (`@appport/resolver` 0.4.0, the unpublished build vendored in `vendor/`, run in-process as its own install). Includes 20 governed-execution tests (Resolver enforcing a policy, the approval signer over HTTP) | `npm test` | 33/33 pass |
+| Multi-process e2e: Resolver's own CLI (`init`, `serve`, `keys`, `set`), `feltkit dev` running the component, a separate consumer process, people over HTTP, an agent over MCP | `npm run test:e2e` (`processes.test.mjs`) | pass |
+| Multi-process governed e2e: prod under a policy set with Resolver's operator CLI, the signer as its own process with its own key and session, a registered consumer reporting use, adoption read back | `npm run test:e2e` (`governed.test.mjs`) | pass |
 | The compiled AppBoundry artifact: build it, then run the full lifecycle through its WebAssembly guest in FeltKit's reference AppBoundry host | `npm run test:artifact` | 1/1 pass |
 | Artifact reproducibility | two `feltkit build --target appboundry` runs, no source change | `manifest.json`, `module.wasm` and `components/resolver.mjs` byte-identical |
 | The UI, driven in Chromium through the model scenario (configure, load metadata, propose as Grace, refused for Barbara, approved by Linus, verified) | Playwright, by hand during development (not a committed test) | no console errors; screens reviewed at 1440 px and 390 px (no horizontal overflow) |
@@ -132,18 +133,20 @@ unpublished. Without the component, a deployed artifact can record governance bu
 Today the product runs under `feltkit dev` / `feltkit start`, where components run in-process. The FeltKit
 production targets (`feltkit deploy`) were not exercised for this application.
 
-Second: **blast radius is declared, not observed (gap R1).** Impact analysis is honest about it, but it is the
-main thing standing between this product and a trustworthy "who is affected".
+Second: **observed consumers depend on Resolver 0.4.0, unpublished.** With it, impact shows who Resolver saw
+resolving a reference, next to declared consumers, and each verified change shows its adoption. Unregistered
+consumers appear only once they resolve, and "adopted" is what consumers report (gap R1, closed;
+[AUTHORIZATION-INTEGRATION.md](AUTHORIZATION-INTEGRATION.md)).
+
+Third: **governance is enforced by Resolver only where its operator sets a policy, and only with the approval
+signer running.** The signer is not packaged or deployed yet, and it trusts this application's records.
 
 ## What would make Resolver substantially more powerful for this product
 
 In order of value:
 
-1. **Usage reporting (R1).** Which principals resolved a reference, when, and at which revision. This would turn
-   impact analysis from declared to observed, catch undeclared consumers, and show when a change has actually
-   propagated (all consumers on the new revision), which today can only be inferred from TTL.
-2. **Approval-enforced writes (R4).** Today governance is a convention backed by key hygiene; this would make it a
-   Resolver guarantee.
+1. **Done in 0.4.0, adopted here:** usage reporting (R1) and approval-enforced writes (R4). Publish them.
+2. **A "who am I" (R9).** Small; it removes a workaround.
 3. **Dry run (R2) and readable schemas (R3).** All validation would happen before approval instead of some at
    execution.
 4. **History cursor and tamper evidence (R6, R5).** For evidence that survives an administrator and references

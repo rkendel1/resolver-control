@@ -83,6 +83,7 @@ h3 { font-size: var(--stack-text-xs-size); text-transform: uppercase; letter-spa
 }
 .basis-observed { color: var(--stack-color-status-positive-fg); }
 .basis-declared { color: var(--stack-color-status-progress-fg); }
+.basis-asserted { color: var(--stack-color-status-neutral-fg); }
 .basis-derived { color: var(--stack-color-status-attention-fg); }
 .basis-unknown { color: var(--stack-color-text-muted); }
 

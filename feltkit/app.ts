@@ -41,6 +41,8 @@ export const app = feltkit({
     consumer_app: ["catalog.read", "consumers.declare"],
     // The resolver component: records observations, validation and execution evidence; claims approved work.
     executor: ["catalog.read", "changes.read", "settings.read", "observations.write", "changes.execute"],
+    // The approval signer (signer/, its own process): reads a change and its audit trail to decide whether to sign. Nothing else.
+    signer: ["changes.read", "activity.read"],
   },
   dev: {
     users: [
@@ -58,7 +60,8 @@ export const app = feltkit({
       routes: ["/_resolver-control/"],
       required: false,
       principal: { id: "component:resolver", roles: ["executor"], displayName: "Resolver executor" },
-      credentials: ["resolver-api-key"],
+      // approval-signer-token: presented to the approval signer (signer/), which holds the signing key; optional.
+      credentials: ["resolver-api-key", "approval-signer-token"],
       network: "egress",
       description: "Observes Resolver, validates proposed changes, executes approved ones with Resolver's conditional writes, and verifies them.",
     },
@@ -83,6 +86,8 @@ export const settings = app.collection("settings", {
   resolverUrl: s.string({ minLength: 1, maxLength: 2048 }),
   namespaces: s.array(s.string({ minLength: 1, maxLength: 64 })),
   syncIntervalSeconds: s.integer({ minimum: 1, maximum: 3600 }),
+  /** The approval signer's origin (signer/). Set: every write carries a change authorization it signed. Unset: writes carry none. */
+  signerUrl: s.optional(s.string({ minLength: 1, maxLength: 2048 })),
   updatedBy: s.string(),
   updatedAt: s.number(),
 }, { description: "The Resolver origin and the environments (reference namespaces) under management. The API key is a declared component credential, never stored here." });
@@ -116,6 +121,37 @@ export const dependencies = app.collection("dependencies", {
   updatedAt: s.number(),
 }, { unique: [["ref"]], indexes: [{ fields: ["environment"] }, { fields: ["path"] }], search: ["title", "ref", "owner"], description: "Ownership, criticality and change class of each runtime dependency." });
 
+/** How Resolver says a revision was authorized (Resolver 0.4.0 history): a change authorization, or operator break-glass. */
+export const Governance = s.object({
+  mode: s.enum(["authorized", "break-glass"]),
+  issuer: s.optional(s.string()),
+  kid: s.optional(s.string()),
+  jti: s.optional(s.string()),
+  decision: s.optional(s.string()),
+  approvers: s.optional(s.array(s.string())),
+  actor: s.optional(s.string()),
+  reason: s.optional(s.string()),
+});
+
+/** What Resolver knows about one consumer of a reference, kept apart by basis (Resolver's `resolver.consumers.list`). */
+export const ObservedConsumer = s.object({
+  principal: s.string(),
+  /** Registered: the consumer said who it is (asserted). */
+  application: s.optional(s.string()),
+  environment: s.optional(s.string()),
+  instance: s.optional(s.string()),
+  registration: s.optional(s.string()),
+  /** Declared to Resolver in the consumer's registration (asserted). */
+  declared: s.boolean(),
+  /** Resolved: Resolver served it this revision (observed). */
+  resolvedRevision: s.optional(s.integer()),
+  resolvedAt: s.optional(s.string()),
+  /** Used: the consumer reported using this revision (asserted). */
+  usedRevision: s.optional(s.integer()),
+  usedOutcome: s.optional(s.string()),
+  usedAt: s.optional(s.string()),
+});
+
 const HistoryEntry = s.object({
   revision: s.integer(),
   action: s.string(),
@@ -125,6 +161,7 @@ const HistoryEntry = s.object({
   reason: s.optional(s.string()),
   at: s.string(),
   restoredFrom: s.optional(s.integer()),
+  governance: s.optional(Governance),
 });
 
 /** A read-only projection of Resolver, stamped with what was read and when. Written by the component only. */
@@ -148,6 +185,9 @@ export const observations = app.collection("observations", {
   /** False when the executor key no longer sees the reference (grant removed). */
   visible: s.boolean(),
   observedAt: s.number(),
+  /** Who Resolver has seen resolve or report using the reference, when it was last read. Absent: never read (or Resolver predates 0.4.0). */
+  observedConsumers: s.optional(s.array(ObservedConsumer)),
+  consumersObservedAt: s.optional(s.number()),
 }, { unique: [["ref"]], indexes: [{ fields: ["environment"] }, { fields: ["path"] }], description: "What Resolver answered, at which revision, when. Not authoritative." });
 
 /** Who resolves a reference. Resolver does not report consumers, so every entry here is declared, never inferred. */
@@ -188,11 +228,31 @@ export const Impact = s.object({
   requiredApprovals: s.integer(),
   propagation: s.string(),
   declaredConsumers: s.array(s.object({ application: s.string(), usage: s.optional(s.string()), source: s.string() })),
+  /** Consumers Resolver observed resolving this reference (or that reported using it), when the proposal was made. */
+  observedConsumers: s.optional(s.array(ObservedConsumer)),
   observedRelationships: s.array(s.object({ ref: s.string(), relation: s.string() })),
   differences: s.array(s.string()),
   fallback: s.string(),
   warnings: s.array(s.string()),
   unknowns: s.array(s.string()),
+});
+
+/**
+ * Resolver's adoption stages for a committed revision (`resolver.adoption`). Each stage keeps its basis: committed
+ * and available are Resolver's records; fetched is observed; adopted is asserted by consumers; functionally
+ * verified has no producer yet. A notification reaching a consumer is none of them.
+ */
+export const Adoption = s.object({
+  at: s.number(),
+  revision: s.integer(),
+  currentRevision: s.integer(),
+  authorized: s.object({ mode: s.string(), jti: s.optional(s.string()), issuer: s.optional(s.string()), consumedAt: s.optional(s.string()) }),
+  committedAt: s.string(),
+  available: s.object({ current: s.boolean(), until: s.nullable(s.string()) }),
+  fetched: s.array(ObservedConsumer),
+  notYetFetched: s.array(ObservedConsumer),
+  adopted: s.array(ObservedConsumer),
+  functionallyVerified: s.null(),
 });
 
 export const STATUSES = ["proposed", "ready", "invalid", "approved", "executing", "verified", "failed", "unknown", "superseded", "rejected", "cancelled"] as const;
@@ -227,6 +287,8 @@ export const changes = app.collection("changes", {
     resolverRevision: s.optional(s.integer()),
     error: s.optional(s.object({ code: s.string(), reason: s.optional(s.string()), message: s.string() })),
     note: s.optional(s.string()),
+    /** The change authorization the approval signer issued for this attempt: its id and expiry, never the token. */
+    authorization: s.optional(s.object({ jti: s.string(), expiresAt: s.string(), issuedAt: s.number() })),
   })),
   verification: s.optional(s.object({
     at: s.number(),
@@ -238,7 +300,10 @@ export const changes = app.collection("changes", {
     bindingMatches: s.boolean(),
     selected: s.optional(s.unknown()),
     checks: s.array(Check),
+    governance: s.optional(Governance),
   })),
+  /** Adoption of the revision this change committed, as Resolver reports it, stage by stage. Refreshed for a day after verification. */
+  adoption: s.optional(Adoption),
   /** The change this one reverts, or the reference this one promotes from. */
   revertOf: s.optional(s.string()),
   promotedFrom: s.optional(s.object({ ref: s.string(), revision: s.integer() })),

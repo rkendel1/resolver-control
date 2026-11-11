@@ -2,6 +2,7 @@ import { fail, s } from "@feltdb/feltkit";
 import { app, settings, syncStatus } from "./app.js";
 import { record } from "./_audit.js";
 
+const ORIGIN = /^https?:\/\/[^\s/?#@]+(:\d+)?\/?$/i;
 const NAMESPACE = /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/;
 const Settings = s.doc(settings);
 const Sync = s.doc(syncStatus);
@@ -22,18 +23,22 @@ export const set = app.mutation({
     resolverUrl: s.string({ minLength: 1, maxLength: 2048 }),
     namespaces: s.array(s.string({ minLength: 1, maxLength: 64 }), { minItems: 1, maxItems: 20 }),
     syncIntervalSeconds: s.optional(s.integer({ minimum: 1, maximum: 3600 })),
+    /** The approval signer's origin; null removes it; omitted keeps it. */
+    signerUrl: s.optional(s.nullable(s.string({ minLength: 1, maxLength: 2048 }))),
   },
   returns: Settings,
   capability: { name: "settings.set", description: "Set the Resolver origin and the environments (reference namespaces) this application manages. The API key is a component credential, set on the host." },
-  handler: async (ctx, { resolverUrl, namespaces, syncIntervalSeconds }) => {
+  handler: async (ctx, { resolverUrl, namespaces, syncIntervalSeconds, signerUrl }) => {
     const who = ctx.auth.requirePrincipal();
-    if (!/^https?:\/\/[^\s/?#@]+(:\d+)?\/?$/i.test(resolverUrl)) fail("INVALID_ARGUMENT", "resolverUrl must be an origin: http(s)://host[:port], with no path or credentials.");
+    if (!ORIGIN.test(resolverUrl)) fail("INVALID_ARGUMENT", "resolverUrl must be an origin: http(s)://host[:port], with no path or credentials.");
+    if (signerUrl && !ORIGIN.test(signerUrl)) fail("INVALID_ARGUMENT", "signerUrl must be an origin: http(s)://host[:port], with no path or credentials.");
     const bad = namespaces.find((n) => !NAMESPACE.test(n));
     if (bad !== undefined) fail("INVALID_ARGUMENT", `"${bad}" is not a reference namespace (lowercase letters, digits, ".", "_", "-").`);
     const existing = (await ctx.db.find(settings, {}, { limit: 1 }))[0];
-    const fields = { resolverUrl: resolverUrl.replace(/\/$/, ""), namespaces: [...new Set(namespaces)].sort(), syncIntervalSeconds: syncIntervalSeconds ?? existing?.syncIntervalSeconds ?? 5, updatedBy: who.id, updatedAt: Date.now() };
+    const signer = signerUrl === undefined ? existing?.signerUrl : signerUrl === null ? undefined : signerUrl.replace(/\/$/, "");
+    const fields = { resolverUrl: resolverUrl.replace(/\/$/, ""), namespaces: [...new Set(namespaces)].sort(), syncIntervalSeconds: syncIntervalSeconds ?? existing?.syncIntervalSeconds ?? 5, ...(signer ? { signerUrl: signer } : {}), updatedBy: who.id, updatedAt: Date.now() };
     const id = existing ? (await ctx.db.replace(settings, existing.id, fields)).id : await ctx.db.insert(settings, fields);
-    await record(ctx, "settings", id, "settings.changed", { resolverUrl: fields.resolverUrl, namespaces: fields.namespaces, previous: existing ? { resolverUrl: existing.resolverUrl, namespaces: existing.namespaces } : null });
+    await record(ctx, "settings", id, "settings.changed", { resolverUrl: fields.resolverUrl, namespaces: fields.namespaces, signerUrl: signer ?? null, previous: existing ? { resolverUrl: existing.resolverUrl, namespaces: existing.namespaces, signerUrl: existing.signerUrl ?? null } : null });
     return (await ctx.db.get(settings, id))!;
   },
 });

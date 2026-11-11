@@ -122,6 +122,20 @@ export function credentialRefs(kind: string, targets: WeightedTarget[]): string[
   return [...new Set(targets.map((t) => obj(t.value)["credential"]).filter((c): c is string => typeof c === "string"))].sort();
 }
 
+export interface ObservedConsumer {
+  principal: string;
+  application?: string | undefined;
+  environment?: string | undefined;
+  instance?: string | undefined;
+  registration?: string | undefined;
+  declared: boolean;
+  resolvedRevision?: number | undefined;
+  resolvedAt?: string | undefined;
+  usedRevision?: number | undefined;
+  usedOutcome?: string | undefined;
+  usedAt?: string | undefined;
+}
+
 export interface ImpactInput {
   ref: string;
   kind: string;
@@ -131,6 +145,8 @@ export interface ImpactInput {
   current: { revision: number; strategy?: string | undefined; targets: WeightedTarget[]; ttlSeconds?: number | undefined; observedAt: number } | null;
   next: { strategy: string; targets: WeightedTarget[] } | null;
   consumers: Array<{ application: string; usage?: string | undefined; source: string }>;
+  /** What Resolver observed resolving (or reported using) this reference; null when it has not been read. */
+  observedConsumers?: Array<ObservedConsumer> | null;
   /** Models (in any environment) observed to name this reference as their credential. */
   dependents: string[];
   now: number;
@@ -191,8 +207,18 @@ export function computeImpact(input: ImpactInput) {
   if (!input.policy.explicit) warnings.push(`No policy is recorded for ${input.policy.environment}; it is treated as protected.`);
   if (criticality === "unassessed") unknowns.push("Nobody has recorded this dependency's criticality or owner.");
   if (changeClass === "unknown") unknowns.push("Nobody has assessed whether another implementation is a drop-in runtime change.");
-  if (!input.consumers.length) unknowns.push("No consumer is declared. Resolver does not report which applications resolve a reference, so who is affected is unknown.");
-  else unknowns.push("Consumers are declared, not observed: an undeclared application may also resolve this reference.");
+  const observed = input.observedConsumers ?? null;
+  if (observed === null) {
+    if (!input.consumers.length) unknowns.push("No consumer is declared, and Resolver's consumer records have not been read: who is affected is unknown.");
+    else unknowns.push("Consumers are declared, not observed: an undeclared application may also resolve this reference.");
+  } else {
+    const resolving = observed.filter((c) => c.resolvedRevision !== undefined);
+    if (resolving.length) warnings.push(`Resolver observed ${resolving.length} consumer(s) resolving this reference: ${resolving.map((c) => c.application ?? c.principal).join(", ")}.`);
+    const named = new Set(observed.map((c) => c.application).filter(Boolean));
+    const undeclaredHere = [...named].filter((a) => !input.consumers.some((d) => d.application === a));
+    if (undeclaredHere.length) warnings.push(`Observed but not declared here: ${undeclaredHere.join(", ")}.`);
+    unknowns.push("Observed consumers are those Resolver recorded resolving since it began recording; an application that has not resolved since then is not listed. Usage is reported by consumers, not observed.");
+  }
   unknowns.push("Downtime and provider behaviour cannot be observed from Resolver; verification proves what the reference resolves to, not that the new target works.");
 
   const ttl = before?.ttlSeconds;
@@ -211,6 +237,7 @@ export function computeImpact(input: ImpactInput) {
     requiredApprovals: required,
     propagation,
     declaredConsumers: input.consumers.map((c) => ({ application: c.application, ...(c.usage ? { usage: c.usage } : {}), source: c.source })),
+    ...(observed ? { observedConsumers: observed } : {}),
     observedRelationships,
     differences,
     fallback,

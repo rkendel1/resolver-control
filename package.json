@@ -17,11 +17,12 @@
     "test:artifact": "feltkit build --target appboundry && node --import tsx --test artifact-tests/*.test.ts",
     "demo": "node scripts/demo.mjs",
     "measure": "feltkit measure",
-    "measure:check": "feltkit measure --check"
+    "measure:check": "feltkit measure --check",
+    "signer": "node --import tsx signer/server.ts"
   },
   "dependencies": {
-    "@appport/resolver-client": "0.2.4",
-    "@appport/resolver-core": "0.1.1",
+    "@appport/resolver-client": "file:vendor/appport-resolver-client-0.3.0.tgz",
+    "@appport/resolver-core": "file:vendor/appport-resolver-core-0.2.0.tgz",
     "@feltdb/feltkit": "0.3.25",
     "@stack-ui/core": "^0.8.1",
     "@stack-ui/react": "^0.8.1",
@@ -34,7 +35,11 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "5.1.0",
+    "tsx": "4.20.6",
     "typescript": "5.9.3",
     "vite": "7.3.7"
+  },
+  "overrides": {
+    "@appport/resolver-core": "file:vendor/appport-resolver-core-0.2.0.tgz"
   }
 }

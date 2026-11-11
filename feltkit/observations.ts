@@ -5,7 +5,7 @@
  * based on, and Resolver checks it.
  */
 import { s } from "@feltdb/feltkit";
-import { app, KINDS, observations } from "./app.js";
+import { app, Governance, KINDS, ObservedConsumer, observations } from "./app.js";
 import { record } from "./_audit.js";
 import { CORRELATION_PREFIX, credentialRefs, parseRef, type WeightedTarget } from "./_rules.js";
 
@@ -18,6 +18,7 @@ const Entry = s.object({
   reason: s.optional(s.string()),
   at: s.string(),
   restoredFrom: s.optional(s.integer()),
+  governance: s.optional(Governance),
 });
 
 const Observed = s.object({
@@ -57,7 +58,8 @@ export const upsert = app.mutation({
         visible: true,
         observedAt: Date.now(),
       };
-      if (existing) await ctx.db.replace(observations, existing.id, fields);
+      // Consumer facts are read separately (recordConsumers): a new revision does not erase them.
+      if (existing) await ctx.db.replace(observations, existing.id, { ...fields, ...(existing.observedConsumers ? { observedConsumers: existing.observedConsumers, consumersObservedAt: existing.consumersObservedAt } : {}) });
       else await ctx.db.insert(observations, fields);
       // Revisions written since the last observation that this application did not write: a change
       // made directly in Resolver (its CLI, its pages, another tool). Recorded, never hidden.
@@ -68,11 +70,29 @@ export const upsert = app.mutation({
         const ours = typeof entry.reason === "string" && entry.reason.includes(CORRELATION_PREFIX);
         if (!ours) {
           outOfBand += 1;
-          await record(ctx, "dependency", item.ref, "resolver.change.out_of_band", { revision: entry.revision, action: entry.action, resolverActor: entry.actor, reason: entry.reason ?? null, at: entry.at });
+          await record(ctx, "dependency", item.ref, "resolver.change.out_of_band", { revision: entry.revision, action: entry.action, resolverActor: entry.actor, reason: entry.reason ?? null, at: entry.at, governance: entry.governance?.mode ?? "ungoverned" });
+        }
+        // Resolver records operator break-glass on the revision itself: surfaced as its own event, whoever wrote it.
+        if (entry.governance?.mode === "break-glass") {
+          await record(ctx, "dependency", item.ref, "resolver.change.break_glass", { revision: entry.revision, action: entry.action, operator: entry.governance.actor ?? entry.actor, reason: entry.governance.reason ?? null, at: entry.at });
         }
       }
     }
     return { written: items.length, outOfBand };
+  },
+});
+
+/** Resolver's consumer facts for references (Resolver 0.4.0 `resolver.consumers.list`): a projection, replaced on each read. */
+export const recordConsumers = app.mutation({
+  access: "observations.write",
+  args: { items: s.array(s.object({ ref: s.string(), consumers: s.array(ObservedConsumer, { maxItems: 200 }) }), { maxItems: 50 }) },
+  handler: async (ctx, { items }) => {
+    const at = Date.now();
+    for (const item of items) {
+      const existing = (await ctx.db.find(observations, { ref: item.ref }, { limit: 1 }))[0];
+      if (existing) await ctx.db.patch(observations, existing.id, { observedConsumers: item.consumers, consumersObservedAt: at });
+    }
+    return null;
   },
 });
 

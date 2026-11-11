@@ -11,8 +11,11 @@ export const RESOLVER_VERSION = "0.3.3";
 /**
  * RESOLVER_SERVICE_FROM: a directory holding packed Resolver tarballs (`npm pack` of core, client and server),
  * to test a Resolver build that is not published yet. Its packages resolve to each other through overrides.
+ * Defaults to `vendor/` while this application integrates the unpublished Resolver 0.4.0 (set it to "" for the
+ * published RESOLVER_VERSION).
  */
-const FROM = process.env.RESOLVER_SERVICE_FROM;
+const VENDOR = fileURLToPath(new URL("../../vendor", import.meta.url));
+const FROM = (process.env.RESOLVER_SERVICE_FROM ?? (existsSync(VENDOR) ? VENDOR : "")) || undefined;
 const dir = FROM
   ? fileURLToPath(new URL(`../../.tmp/resolver-service-local-${createHash("sha256").update(readdirSync(FROM).sort().map((f) => f + statSync(join(FROM, f)).mtimeMs).join()).digest("hex").slice(0, 12)}`, import.meta.url))
   : fileURLToPath(new URL(`../../.tmp/resolver-service-${RESOLVER_VERSION}`, import.meta.url));

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryState } from "@feltdb/feltkit/react";
 import { ActivityTimeline, Button, DataTable, FilterBar, Form, FreshnessLabel, MetadataList, Select, TextField } from "@stack-ui/react";
 import { api } from "../../feltkit/_generated/api";
+import { Consumers } from "./Changes";
 import { askReason, attempt, Actor, Basis, can, Card, Empty, EVENT_LABEL, go, Json, Live, PageHead, Ref, State, useApp, when } from "../ui";
 
 const CATEGORIES = ["ai", "search", "email", "communications", "payments", "identity", "storage", "analytics", "data", "processing", "integrations", "operations", "credentials", "configuration", "agents", "other"];
@@ -180,7 +181,21 @@ export function DependencyDetail({ refName }: { refName: string }) {
             {o && o.kind !== "secret" && o.state === "active" && can(app.permissions, "changes.propose") && <ProposeCard observation={o} />}
             <div className="grid-2">
               <ConsumersCard refName={d.ref} consumers={d.consumers} />
-              <Card title={<>Relationships <Basis kind="observed" /></>} subtitle="Read from bindings; Resolver reports no consumers">
+              <Card title={<>Consumers <Basis kind="observed" /></>} subtitle={o?.consumersObservedAt ? `Resolver's records, read ${when(o.consumersObservedAt)}` : "Resolver's records"}>
+                {!o?.observedConsumers ? (
+                  <Empty title="Not read from Resolver">Resolver 0.4.0 records who resolves a reference; this Resolver has not reported any yet.</Empty>
+                ) : o.observedConsumers.length === 0 ? (
+                  <Empty title="Nobody seen resolving it">Since Resolver began recording. An application that has not resolved since then is not listed.</Empty>
+                ) : (
+                  <>
+                    <Consumers list={o.observedConsumers} />
+                    <p className="small muted">Resolved is observed by Resolver. Application, instance and use are reported by the consumer (asserted). This application's own reads are not listed.</p>
+                  </>
+                )}
+              </Card>
+            </div>
+            <div className="grid-2">
+              <Card title={<>Relationships <Basis kind="observed" /></>} subtitle="Read from bindings">
                 {d.credentials.length === 0 && d.dependents.length === 0 ? <Empty title="No credential relationships" /> : (
                   <ul className="list">
                     {d.credentials.map((c) => (
@@ -304,7 +319,7 @@ function ConsumersCard({ refName, consumers }: { refName: string; consumers: Det
   const [application, setApplication] = useState("");
   const [usage, setUsage] = useState("");
   return (
-    <Card title={<>Consumers <Basis kind="declared" /></>} subtitle="Resolver does not report who resolves a reference. These are declarations, not observations.">
+    <Card title={<>Consumers <Basis kind="declared" /></>} subtitle="Declared here by people, agents or the application. What Resolver observed is listed separately.">
       {consumers.length === 0 ? <Empty title="No consumer declared">The blast radius of a change is unknown.</Empty> : (
         <ul className="list">
           {consumers.map((c) => (

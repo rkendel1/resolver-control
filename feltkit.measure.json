@@ -1,8 +1,28 @@
 {
   "report": "docs/measure.json",
   "classify": [
-    { "path": "component/**", "class": "infrastructure", "reason": "The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key." },
-    { "path": "examples/**", "class": "tests", "reason": "A consuming application used by the e2e to prove a running consumer follows a governed change without restart." },
-    { "path": "artifact-tests/**", "class": "tests", "reason": "Runs the change lifecycle through the compiled AppBoundry artifact." }
-  ]
+    {
+      "path": "component/**",
+      "class": "infrastructure",
+      "reason": "The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key."
+    },
+    {
+      "path": "examples/**",
+      "class": "tests",
+      "reason": "A consuming application used by the e2e to prove a running consumer follows a governed change without restart."
+    },
+    {
+      "path": "artifact-tests/**",
+      "class": "tests",
+      "reason": "Runs the change lifecycle through the compiled AppBoundry artifact."
+    },
+    {
+      "path": "signer/**",
+      "class": "infrastructure",
+      "reason": "The approval signer: a separate process that holds the change-authorization signing key, reads a change through this application as its own read-only principal, and signs only approved changes. Kept out of the application and its component by design (docs/AUTHORIZATION-INTEGRATION.md)."
+    }
+  ],
+  "acknowledged": {
+    "http-server:signer/server.ts": "The approval signer must not run as this application's functions or component: it holds the signing key and must stay outside the trust boundary of the application it checks. A stateless HTTP endpoint (POST /sign) in its own process is the smallest form. See docs/AUTHORIZATION-INTEGRATION.md."
+  }
 }

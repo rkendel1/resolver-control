@@ -34,7 +34,7 @@ export async function record(ctx: MutationCtx, subject: Subject, id: string, typ
 /** A reference's events and its changes' events, newest first. */
 /** Every event, or one subject id's, newest first. */
 export async function recentEvents(ctx: QueryCtx | MutationCtx, filter: { subjectId?: string; type?: string } = {}, limit = 200): Promise<AuditEventRecord[]> {
-  return (await ctx.db.find(events, filter as never, { orderBy: [{ field: "at", direction: "desc" }], limit })) as unknown as AuditEventRecord[];
+  return (await ctx.db.find(events, filter as never, { orderBy: [{ field: "at", direction: "desc" }, { field: "seq", direction: "desc" }], limit })) as unknown as AuditEventRecord[];
 }
 
 export async function referenceHistory(ctx: QueryCtx | MutationCtx, ref: string, limit = 200): Promise<AuditEventRecord[]> {

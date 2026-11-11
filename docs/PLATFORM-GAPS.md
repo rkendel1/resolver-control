@@ -4,31 +4,31 @@ Gaps found while building Resolver Control, each verified against code or by a t
 belong to Resolver, FeltKit, AppBoundry or AppPort; **application** gaps belong to this repository. Each
 entry gives its effect on the product and the smallest change that would close it.
 
-## Resolver (`@appport/resolver` 0.3.3)
+## Resolver (`@appport/resolver` 0.3.3 → 0.4.0)
 
-**Milestone implemented, not published:** R1 (consumer registration, observed resolutions, asserted usage, adoption
-lifecycle) and R4 (mutation policies, Ed25519 change authorizations consumed in the revision's transaction, explicit
-operator break-glass) are in `@appport/resolver` 0.4.0 (rkendel1/resolver, branch `claude/youthful-thompson-bhqeox`).
-Its guarantees and limitations are in that repository's `docs/governance-guarantees.md`.
+The gaps were found against 0.3.3. R1 and R4 are closed by `@appport/resolver` 0.4.0, which is **implemented,
+unpublished, and adopted here**: vendored in `vendor/`, see [AUTHORIZATION-INTEGRATION.md](AUTHORIZATION-INTEGRATION.md).
+What 0.4.0 adds:
 
-This application has **not adopted them yet**. Under a 0.4.0 policy, its approved changes fail safely with
-`resolver.authorization-required` (tested with `RESOLVER_SERVICE_FROM`). Adopting them means four things: issuing
-authorizations from the component (an Ed25519 key as a component credential, `signChangeAuthorization`); reading
-`resolver.consumers.list` and `resolver.adoption` for impact; verifying by `governance.jti` instead of the reason
-tag; and registering this application's own consumers.
+* R1: consumer registration, observed resolution records, asserted usage reports, and an adoption lifecycle.
+* R4: mutation policies, Ed25519 change authorizations consumed in the revision's transaction, and explicit
+  operator break-glass.
+
+Its guarantees and limitations are in rkendel1/resolver `docs/governance-guarantees.md`.
 
 | # | Gap | Evidence | Effect here | What would close it |
 |---|---|---|---|---|
-| R1 | **No consumer or usage information.** Resolver authenticates every resolution by API key, but records it only as a log line. Secret reveals are the one durable use record. Nothing names consumers or what they use. | `app.ts:108` (log line per call); `store.ts:110` `RevealRecord` (secrets only); no consumer collection in `store.ts:27` `COLLECTIONS`; `resolver-core/protocol.ts` `CAPABILITIES` has no usage capability | Impact analysis can only use *declared* consumers, and says so ("an undeclared application may also resolve this reference"). Blast radius is unknown for undeclared consumers. Adoption of a change is unmeasurable. | **Implemented in Resolver 0.4.0 (unpublished); not yet used here.** Registration, observed resolution records, asserted usage reports, an adoption lifecycle. |
+| R1 | **No consumer or usage information.** Resolver authenticates every resolution by API key, but records it only as a log line. Secret reveals are the one durable use record. Nothing names consumers or what they use. | `app.ts:108` (log line per call); `store.ts:110` `RevealRecord` (secrets only); no consumer collection in `store.ts:27` `COLLECTIONS`; `resolver-core/protocol.ts` `CAPABILITIES` has no usage capability | Impact analysis can only use *declared* consumers, and says so ("an undeclared application may also resolve this reference"). Blast radius is unknown for undeclared consumers. Adoption of a change is unmeasurable. | **Closed by Resolver 0.4.0; adopted here.** Observed consumers in impact and on each dependency; adoption per verified change (fetched observed, adopted asserted, not yet fetched derived). |
 | R2 | **No dry run.** Catalog checks (provider/model), value-schema checks and agent contract pins run only inside `put`. | `resolver.ts:#put` (`checkBinding`, then `#checkTargets`, only on write) | Validation marks these checks `deferred`. A change can be approved, then refused at execution (`failed`, reference unchanged). Safe, but late. | `put { …, dryRun: true }` returning the same refusal without writing. Not in this milestone. |
 | R3 | **A value reference's JSON Schema is not readable.** | `ResolveResult` (`protocol.ts`) has no schema | Value bindings cannot be checked before execution. | Include `schema` in `resolve`. Not in this milestone. |
-| R4 | **Resolver cannot require approval, and the operator bypasses grants.** Any key with `write` changes a reference. The host operator is allowed everything. | `authorizer.ts:decide` (`isOperator` short-circuits; otherwise any `write` grant); `resolver.ts:#put/#rollback/#revoke` check only `#require(write)` and the revision | Governance holds only if the executor key is the only prod writer. Direct writes are *detected* (out-of-band events, superseded changes), not *prevented*. | **Implemented in Resolver 0.4.0 (unpublished); not yet used here.** Per-pattern mutation policies, Ed25519 change authorizations verified locally and consumed in the revision's transaction, and explicit operator break-glass with governance events. |
+| R4 | **Resolver cannot require approval, and the operator bypasses grants.** Any key with `write` changes a reference. The host operator is allowed everything. | `authorizer.ts:decide` (`isOperator` short-circuits; otherwise any `write` grant); `resolver.ts:#put/#rollback/#revoke` check only `#require(write)` and the revision | Governance holds only if the executor key is the only prod writer. Direct writes are *detected* (out-of-band events, superseded changes), not *prevented*. | **Closed by Resolver 0.4.0; adopted here.** Under a policy, a write needs an authorization from the approval signer (`signer/`), which signs only an approved change; break-glass revisions are surfaced as their own event. |
 | R5 | **History is not tamper-evident**, and the correlation tag in `reason` is unsigned. | Resolver README, Limits | Evidence that the store's administrator can edit. | Hash-chained or signed revisions. |
 | R6 | **History has no cursor.** It is oldest first, and `limit` keeps the newest N (max 1000). | `resolver.ts history`: `rows.slice(-limit)` | Reconciliation searches the newest 100 revisions for a change's tag. A reference rewritten more than 100 times between attempt and reconciliation would be reported `unknown`, not guessed. | `history { before?: revision, limit }`. |
 | R7 | **Grants are per API key, with no groups or roles.** | Resolver README, Limits | One key per environment boundary must be managed by hand. | Groups, or keys scoped to a pattern set at creation. |
+| R9 | **No "who am I", and management reads count as resolutions.** A key cannot ask Resolver its own principal. This application's synchronization and verification reads are recorded like any consumer's. | 0.4.0 `resolver.ts` `resolve` records every outcome; no identity capability in `protocol.ts` `CAPABILITIES` | Without care, Resolver Control would list itself as a consumer that "fetched" each revision. Worked around: the component registers as consumer `resolver-control`, learns its principal from that, and excludes it. | A `resolver.whoami` capability, or resolve with `observe: false` for management reads. |
 | R8 | **No target health.** Resolver knows where a reference points, not whether it works. | Design | "Healthy" is never claimed here. Verification proves resolution, not behaviour. | Out of Resolver's scope. A consumer-reported health signal would belong next to R1. |
 
-## FeltKit (0.3.24)
+## FeltKit (0.3.25)
 
 | # | Gap | Evidence | Effect here | What would close it |
 |---|---|---|---|---|
@@ -37,6 +37,7 @@ tag; and registering this application's own consumers.
 | F3 | **`ctx.afterCommit.work` is refused in AppBoundry artifacts.** | `docs/COMPONENTS.md` | The change record doubles as the work queue, with a claim fenced by FeltDB conflicts and a 60 s lease. That is about 40 lines that durable work would have provided. | Durable work in `components@1`. |
 | F4 | **`approval: "required"` is refused in artifacts.** | `appboundry/build.ts` | Not needed: N-of-M, protected-environment and separation-of-duties rules are domain logic anyway. | — |
 | F5 | **Components have no non-secret configuration.** They see declared credentials only. | `ComponentContext` | The Resolver origin is application state (`settings`), set by an admin and audited. That is arguably better. | — |
+| F6 | **A component runs with the application's trust.** It shares the process (FeltKit) or the companion (AppBoundry) and reads credentials from the same host. | `docs/COMPONENTS.md` | The change-authorization signing key cannot be a component credential without letting whoever compromises the app mint authorizations. So the approval signer is a separate process with its own key custody and its own read-only session. | Not necessarily a gap: a separately deployed, separately trusted service is the right shape. A FeltKit "external service" declaration would let the artifact name it. |
 
 ## AppBoundry
 
@@ -65,4 +66,6 @@ proposer) are enforced in the handler and tested.
 | No notification when a change awaits approval. | AppPort Services notifications are available. Not wired. |
 | Endpoint reachability is never probed. | Probing arbitrary targets from the executor is an SSRF risk; reported as `deferred`. |
 | Multi-instance component not tested. | Claims are FeltDB-conflict fenced and writes are conditional, so a second instance cannot double-apply. Not exercised. |
+| **The approval signer is not packaged or deployed.** It runs from a checkout (`npm run signer`). It has one instance, and its key is a PEM file. | Deliberately the smallest trusted signer. An HSM or KMS, a container image, and high availability come with a real deployment. |
+| **The signer trusts this application's records.** A FeltDB administrator here could forge an approved change. | Closing it needs approvals signed by the approvers' own keys. |
 | Discovery is pattern-based. | It reports candidates with evidence and judges nothing: compatibility and adapters are for people, or a future model-backed proposal. |
