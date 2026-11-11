@@ -2,7 +2,7 @@
 
 **Consumer registration, resolution observability, and enforced mutation authority.**
 
-Status: **approved design; implementation in progress** (rkendel1/resolver, branch `claude/youthful-thompson-bhqeox`). Grounded in `@appport/resolver` at `c674d14` (0.3.3). File and line
+Status: **implemented in `@appport/resolver` 0.4.0, unpublished** (rkendel1/resolver, branch `claude/youthful-thompson-bhqeox`; guarantees and limitations in its `docs/governance-guarantees.md`). Grounded in `@appport/resolver` at `c674d14` (0.3.3). File and line
 references are to `packages/server/src` there. Motivated by Resolver Control's gap register
 (`docs/PLATFORM-GAPS.md`, R1 and R4).
 
