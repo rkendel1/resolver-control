@@ -8,7 +8,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ResolverClient } from "@appport/resolver-client";
-import type { TestApp } from "@feltdb/feltkit/testing";
+import type { Caller } from "@feltdb/feltkit/testing";
+import type { PrincipalInput } from "@feltdb/feltkit";
 import { ResolverEngine, type Connect } from "../component/engine.js";
 import { loadResolver } from "./fixtures/resolver-service.mjs";
 
@@ -72,7 +73,8 @@ export async function seedResolver(admin: ResolverClient) {
   await admin.put({ ref: "ref://staging/search", kind: "endpoint", binding: { value: { url: "https://search-b.example.com" } }, expectedRevision: 0, reason: "trying provider B" });
 }
 
-export function engineFor(t: TestApp, resolver: { url: string; executorKey: string }, options: { connect?: Connect } = {}) {
+/** Binds the engine to any test host (FeltKit runtime or the compiled artifact) as the component principal. */
+export function engineFor(t: { as(who: string | PrincipalInput): Caller }, resolver: { url: string; executorKey: string }, options: { connect?: Connect } = {}) {
   const caller = t.as(EXECUTOR);
   return new ResolverEngine({
     call: (name, args) => {
