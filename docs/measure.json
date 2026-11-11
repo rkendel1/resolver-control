@@ -42,7 +42,7 @@
     },
     "tests": {
       "files": 9,
-      "lines": 747
+      "lines": 787
     },
     "third-party": {
       "files": 0,
@@ -498,7 +498,7 @@
       "path": "tests/failures.test.ts",
       "class": "tests",
       "basis": "path: tests",
-      "lines": 249
+      "lines": 272
     },
     {
       "path": "tests/fixtures/resolver-service.d.mts",
@@ -510,13 +510,13 @@
       "path": "tests/fixtures/resolver-service.mjs",
       "class": "tests",
       "basis": "path: tests",
-      "lines": 18
+      "lines": 33
     },
     {
       "path": "tests/helpers.ts",
       "class": "tests",
       "basis": "path: tests",
-      "lines": 73
+      "lines": 75
     },
     {
       "path": "tests/lifecycle.test.ts",

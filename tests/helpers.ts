@@ -24,6 +24,8 @@ export interface RealResolver {
   executorPrincipal: string;
   /** A consuming application's key: read + reveal, no write. */
   consumerKey: string;
+  /** The in-process Resolver runtime, for operator actions (policies) in tests. */
+  runtime: unknown;
   close(): Promise<void>;
 }
 
@@ -55,6 +57,7 @@ export async function startResolver(options: { executorWrite?: string[]; executo
   return {
     url,
     admin,
+    runtime,
     executorKey: executor.secret,
     executorPrincipal: executor.principal,
     consumerKey: consumer.secret,

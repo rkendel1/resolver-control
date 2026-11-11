@@ -281,3 +281,27 @@ test("separation of duties holds even for a person allowed to both propose and a
     await teardown(resolver, t, engine);
   }
 });
+
+test("under a Resolver mutation policy this application cannot satisfy yet, an approved change fails honestly and the reference is unchanged", async (t) => {
+  const { resolver, t: app } = await setup();
+  const runtime = (resolver as unknown as { runtime?: { resolver: { setPolicy?: unknown } } }).runtime;
+  if (!runtime || typeof runtime.resolver.setPolicy !== "function") {
+    await teardown(resolver, app);
+    t.skip("the installed Resolver has no mutation policies (needs @appport/resolver 0.4.0; set RESOLVER_SERVICE_FROM to a build)");
+    return;
+  }
+  const engine = engineFor(app, resolver);
+  try {
+    const operator = (runtime as unknown as { operator(tenant: string): unknown }).operator("acme");
+    await (runtime.resolver as unknown as { setPolicy(p: unknown, i: unknown): Promise<unknown> }).setPolicy(operator, { pattern: "ref://prod/*", operations: ["put", "rollback", "revoke"], issuers: ["resolver-control"], reason: "prod is governed" });
+    await settle(engine, 1);
+    const change = await proposeAndApprove(app, engine);
+    await settle(engine, 1);
+    const after = await app.as("ada").query(api.changes.get, { id: change.id });
+    assert.equal(after.change.status, "failed");
+    assert.equal(after.change.execution!.error!.reason, "resolver.authorization-required");
+    assert.equal((await resolver.admin.resolve("ref://prod/search")).revision, 1, "unchanged");
+  } finally {
+    await teardown(resolver, app, engine);
+  }
+});
