@@ -91,6 +91,7 @@ Builds `resolver-control.app` and runs the lifecycle through its WebAssembly gue
 
 * [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): ownership, components, the change lifecycle, domain model, and the integration map.
 * [docs/PLATFORM-GAPS.md](docs/PLATFORM-GAPS.md): what Resolver, FeltKit and AppBoundry lack, and what this application lacks.
+* [docs/RESOLVER-NEXT-MILESTONE.md](docs/RESOLVER-NEXT-MILESTONE.md): the next Resolver milestone (consumer registration, resolution observability, enforced mutation authority), designed against Resolver's code.
 * [docs/EVIDENCE.md](docs/EVIDENCE.md): what works and how it was proven, what was reused, custom code size, what changes without redeploying, and the current limits.
 
 ## Limits, briefly

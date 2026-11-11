@@ -6,6 +6,11 @@ entry gives its effect on the product and the smallest change that would close i
 
 ## Resolver (`@appport/resolver` 0.3.3)
 
+**Next milestone:** R1 (consumer registration and resolution observability) and R4 (enforced mutation authority)
+are designed in [RESOLVER-NEXT-MILESTONE.md](RESOLVER-NEXT-MILESTONE.md), grounded in Resolver's code. Change
+notifications to running consumers already exist and work (watch stream; proven by the e2e). The missing half is
+*adoption*, which the milestone's resolution records make observable.
+
 | # | Gap | Evidence | Effect here | What would close it |
 |---|---|---|---|---|
 | R1 | **No consumer or usage information.** Resolver authenticates every resolution by API key, but exposes nothing about who resolved what. | `CAPABILITIES` in `resolver-core/protocol.ts`: no usage capability | Impact analysis can only use *declared* consumers, and says so ("an undeclared application may also resolve this reference"). Blast radius is unknown for undeclared consumers. | `resolver.usage { ref }` → principals (key names) that resolved it, last time, revision. Counts, never values. This is the single largest improvement available. |
@@ -28,6 +33,8 @@ entry gives its effect on the product and the smallest change that would close i
 | F5 | **Components have no non-secret configuration.** They see declared credentials only. | `ComponentContext` | The Resolver origin is application state (`settings`), set by an admin and audited. That is arguably better. | — |
 
 ## AppBoundry
+
+Tracked separately from Resolver's gaps: this is an execution-platform limitation, not a missing Resolver capability.
 
 | # | Gap | Evidence | Effect here | What would close it |
 |---|---|---|---|---|
