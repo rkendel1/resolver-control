@@ -1,62 +1,85 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQueryState } from "@feltdb/feltkit/react";
+import { ActivityTimeline, Alert, Button, DataTable, EvidenceSummary, MetadataList, StatusIndicator, Tabs, TabPanel, TextField, type VerificationState } from "@stack-ui/react";
 import { api } from "../../feltkit/_generated/api";
-import { attempt, Actor, Badge, Basis, can, Card, Empty, EVENT_LABEL, exact, go, Json, Live, PageHead, Ref, STATUS_LABEL, useApp, when } from "../ui";
+import { askReason, attempt, Actor, Basis, can, Card, Empty, EVENT_LABEL, exact, go, Json, Live, PageHead, Ref, State, useApp, when } from "../ui";
 
-const GROUPS: Array<[string, string[]]> = [
-  ["Open", ["proposed", "ready", "approved", "executing", "unknown"]],
-  ["Verified", ["verified"]],
-  ["Did not happen", ["failed", "invalid", "superseded", "rejected", "cancelled"]],
-  ["All", []],
+const GROUPS: Array<[string, string, string[]]> = [
+  ["open", "Open", ["proposed", "ready", "approved", "executing", "unknown"]],
+  ["verified", "Verified", ["verified"]],
+  ["stopped", "Did not happen", ["failed", "invalid", "superseded", "rejected", "cancelled"]],
+  ["all", "All", []],
 ];
 
 export function Changes() {
   const all = useQueryState(api.changes.list, { limit: 500 });
-  const [group, setGroup] = useState("Open");
+  const [group, setGroup] = useState("open");
   return (
     <>
       <PageHead title="Changes">Every change to what a reference resolves to, from proposal to verified execution. A proposal never executes by itself.</PageHead>
-      <div className="tabs" role="tablist">
-        {GROUPS.map(([name]) => <button key={name} role="tab" aria-selected={group === name} className={group === name ? "on" : ""} onClick={() => setGroup(name)}>{name}</button>)}
-      </div>
-      <Live state={all}>
-        {(rows) => {
-          const statuses = GROUPS.find(([n]) => n === group)![1];
-          const shown = statuses.length ? rows.filter((c) => statuses.includes(c.status)) : rows;
-          return <Card>{shown.length === 0 ? <Empty>No changes here.</Empty> : <ChangeTable rows={shown} />}</Card>;
-        }}
-      </Live>
+      <Tabs label="Changes by status" idPrefix="changes" panelId="changes-panel" active={group} onSelect={setGroup} tabs={GROUPS.map(([id, label]) => ({ id, label }))} />
+      <TabPanel id="changes-panel" idPrefix="changes" active={group}>
+        <Live state={all} what="changes">
+          {(rows) => {
+            const statuses = GROUPS.find(([id]) => id === group)![2];
+            return <Card><ChangeTable label="Changes" rows={statuses.length ? rows.filter((c) => statuses.includes(c.status)) : rows} /></Card>;
+          }}
+        </Live>
+      </TabPanel>
     </>
   );
 }
 
 type ChangeRow = NonNullable<ReturnType<typeof useQueryState<typeof api.changes.list>>["data"]>[number];
 
-export function ChangeTable({ rows }: { rows: ChangeRow[] }) {
+export function ChangeTable({ rows, label, emptyTitle = "No changes here" }: { rows: ChangeRow[]; label: string; emptyTitle?: string }) {
   return (
-    <div className="table-wrap">
-      <table className="table">
-        <thead><tr><th>Change</th><th>Reference</th><th>What</th><th>Status</th><th>Approvals</th><th>Proposed</th></tr></thead>
-        <tbody>
-          {rows.map((c) => (
-            <tr key={c.id} className="clickable" onClick={() => go(`changes/${c.id}`)}>
-              <td><a href={`#/changes/${c.id}`}>CHG-{c.number}</a></td>
-              <td><Ref value={c.ref} /></td>
-              <td>{c.operation === "rollback" ? `Roll back to r${c.toRevision}` : c.operation === "create" ? "Introduce" : "Retarget"}{c.promotedFrom && <span className="muted small"> from {c.promotedFrom.ref}</span>}<div className="muted small">{c.reason}</div></td>
-              <td><Badge status={c.status} /></td>
-              <td className="num">{c.approvals.length}/{c.impact.requiredApprovals}</td>
-              <td className="small"><Actor id={c.proposedBy} type={c.proposedByType} /><div className="muted">{when(c.proposedAt)}</div></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      label={label}
+      emptyTitle={emptyTitle}
+      columns={[{ id: "n", header: "Change" }, { id: "ref", header: "Reference" }, { id: "what", header: "What" }, { id: "status", header: "Status" }, { id: "approvals", header: "Approvals", align: "end" }, { id: "by", header: "Proposed" }]}
+      rows={rows.map((c) => ({
+        key: c.id,
+        onSelect: () => go(`changes/${c.id}`),
+        cells: {
+          n: `CHG-${c.number}`,
+          ref: <Ref value={c.ref} link={false} />,
+          what: <>{c.operation === "rollback" ? `Roll back to r${c.toRevision}` : c.operation === "create" ? "Introduce" : "Retarget"}{c.promotedFrom && <span className="small muted"> from {c.promotedFrom.ref}</span>}<div className="small muted">{c.reason}</div></>,
+          status: <State field="resolver-control.change.status" value={c.status} />,
+          approvals: `${c.approvals.length}/${c.impact.requiredApprovals}`,
+          by: <><Actor id={c.proposedBy} type={c.proposedByType} /><div className="small muted">{when(c.proposedAt)}</div></>,
+        },
+      }))}
+    />
   );
 }
 
 const STEPS = ["proposed", "validated", "approved", "executed", "verified"];
 function stepOf(status: string): number {
   return { proposed: 0, ready: 1, invalid: 1, approved: 2, executing: 3, unknown: 3, failed: 3, verified: 4 }[status] ?? 0;
+}
+
+const CHECK: Record<string, VerificationState> = { pass: "verified", fail: "verification_failed", deferred: "not_evaluated" };
+
+/** Checks as Stack evidence: each a claim with its own verification state. */
+function Checks({ title, outcome, source, at, checks }: { title: string; outcome: ReactNode; source: string; at: number; checks: Array<{ id: string; label: string; outcome: string; detail: string }> }) {
+  return (
+    <EvidenceSummary
+      title={title}
+      headingLevel={2}
+      outcome={outcome}
+      source={source}
+      recordedAt={at}
+      // Stack treats "verified" without its checks as not evaluated (rightly): each claim carries the check that decided it.
+      claims={checks.map((k) => ({
+        label: k.label,
+        value: k.detail,
+        verification: CHECK[k.outcome] ?? "not_evaluated",
+        ...(k.outcome === "pass" || k.outcome === "fail" ? { checks: [{ label: k.label, status: k.outcome === "pass" ? ("passed" as const) : ("failed" as const) }] } : {}),
+        attrs: { "data-check": k.id, "data-outcome": k.outcome },
+      }))}
+    />
+  );
 }
 
 export function ChangeDetail({ id }: { id: string }) {
@@ -69,7 +92,7 @@ export function ChangeDetail({ id }: { id: string }) {
   const revert = useMutation(api.changes.proposeRevert);
   const [note, setNote] = useState("");
   return (
-    <Live state={state}>
+    <Live state={state} what="this change">
       {({ change: c, policy, requiredApprovals, currentRevision }) => {
         const terminal = ["verified", "failed", "superseded", "rejected", "cancelled", "invalid"].includes(c.status);
         const mine = c.proposedBy === app.principal.id;
@@ -78,103 +101,124 @@ export function ChangeDetail({ id }: { id: string }) {
         const step = stepOf(c.status);
         return (
           <>
-            <PageHead title={<><a className="crumb" href="#/changes">Changes</a> / CHG-{c.number}</>} actions={<Badge status={c.status} />}>
-              {c.operation === "rollback" ? `Roll back ` : c.operation === "create" ? "Introduce " : "Retarget "}<Ref value={c.ref} />{c.operation === "rollback" && ` to revision ${c.toRevision}`} — {c.reason}
+            <PageHead title={`CHG-${c.number}`} crumbs={[{ label: "Changes", href: "#/changes" }]} status={<State field="resolver-control.change.status" value={c.status} />}>
+              {c.operation === "rollback" ? "Roll back " : c.operation === "create" ? "Introduce " : "Retarget "}
+              <Ref value={c.ref} />
+              {c.operation === "rollback" && ` to revision ${c.toRevision}`} — {c.reason}
             </PageHead>
-            <ol className={`steps ${["failed", "unknown", "invalid"].includes(c.status) ? "steps-bad" : ""}`}>
+            <ol className={`steps ${["failed", "unknown", "invalid"].includes(c.status) ? "steps-bad" : ""}`} aria-label="Lifecycle">
               {STEPS.map((s, i) => <li key={s} className={i < step || (i === step && c.status === "verified") ? "done" : i === step && !terminal ? "now" : i === step ? "stop" : ""}>{s}</li>)}
-              {terminal && c.status !== "verified" && <li className="stop">{STATUS_LABEL[c.status]}</li>}
             </ol>
 
             {(c.status === "ready" || (c.status === "approved" && policy.frozen)) && (
               <Card title="Decision" subtitle={`${c.approvals.length} of ${requiredApprovals} approvals from different people${policy.protected ? " · protected environment: needs changes.approve.protected" : ""}${policy.frozen ? " · environment frozen" : ""}`}>
-                {currentRevision !== null && currentRevision !== c.basedOnRevision && <p className="error-text">The reference is now at revision {currentRevision}; this change was proposed against {c.basedOnRevision} and will be superseded.</p>}
+                {currentRevision !== null && currentRevision !== c.basedOnRevision && <Alert tone="critical">The reference is now at revision {currentRevision}; this change was proposed against {c.basedOnRevision} and will be superseded.</Alert>}
                 <div className="decision">
-                  <input placeholder="Note (required to reject)" value={note} onChange={(e) => setNote(e.target.value)} />
-                  {c.status === "ready" && <button className="btn primary" disabled={!mayApprove} title={mayApprove ? "" : mine ? "You proposed it" : approvedByMe ? "You already approved" : "You may not approve here"} onClick={() => attempt(app, () => approve({ id: c.id, ...(note ? { note } : {}) }), "Approval recorded.")}>Approve</button>}
-                  {can(app.permissions, "changes.approve") && <button className="btn danger" disabled={note.trim().length < 3} onClick={() => attempt(app, () => reject({ id: c.id, note }), "Rejected.")}>Reject</button>}
+                  <TextField name="note" label="Note" hint="Required to reject" value={note} onChange={setNote} />
+                  <div className="decision-actions">
+                    {c.status === "ready" && <Button label="Approve" variant="primary" disabled={!mayApprove} onClick={() => void attempt(app, () => approve({ id: c.id, ...(note ? { note } : {}) }), "Approval recorded.")} />}
+                    {can(app.permissions, "changes.approve") && <Button label="Reject" variant="danger" disabled={note.trim().length < 3} onClick={() => void attempt(app, () => reject({ id: c.id, note }), "Rejected.")} />}
+                  </div>
                 </div>
-                {!mayApprove && c.status === "ready" && <p className="muted small">{mine ? "The proposer of a change may not approve it." : approvedByMe ? "Another person must approve." : app.principal.type !== "user" ? "Only a person may approve." : "Your roles do not allow approving in this environment."}</p>}
+                {!mayApprove && c.status === "ready" && <p className="small muted">{mine ? "The proposer of a change may not approve it." : approvedByMe ? "Another person must approve." : app.principal.type !== "user" ? "Only a person may approve." : "Your roles do not allow approving in this environment."}</p>}
               </Card>
             )}
 
             <div className="grid-2">
               <Card title="Proposal" subtitle={`By ${c.proposedBy} (${c.proposedByType}) ${exact(c.proposedAt)}`}>
-                <dl className="facts">
-                  <dt>Based on</dt><dd>revision {c.basedOnRevision}{currentRevision !== null && currentRevision !== c.basedOnRevision && !terminal && <> · <span className="error-text">now r{currentRevision}</span></>}</dd>
-                  {c.promotedFrom && <><dt>Promoted from</dt><dd><Ref value={c.promotedFrom.ref} /> r{c.promotedFrom.revision}</dd></>}
-                  {c.revertOf && <><dt>Reverts</dt><dd><a href={`#/changes/${c.revertOf}`}>an earlier change</a></dd></>}
-                  {c.ttlSeconds !== undefined && <><dt>TTL</dt><dd>{c.ttlSeconds} s</dd></>}
-                </dl>
+                <MetadataList
+                  items={[
+                    { label: "Based on", value: <>revision {c.basedOnRevision}{currentRevision !== null && currentRevision !== c.basedOnRevision && !terminal && <span className="error-text"> · now r{currentRevision}</span>}</> },
+                    ...(c.promotedFrom ? [{ label: "Promoted from", value: <><Ref value={c.promotedFrom.ref} /> r{c.promotedFrom.revision}</> }] : []),
+                    ...(c.revertOf ? [{ label: "Reverts", value: <a href={`#/changes/${c.revertOf}`}>an earlier change</a> }] : []),
+                    ...(c.ttlSeconds !== undefined ? [{ label: "TTL", value: `${c.ttlSeconds} s` }] : []),
+                  ]}
+                />
                 <div className="diff">
-                  <div><h3>Before</h3><Json value={c.basedOnTargets.length ? { strategy: c.basedOnStrategy ?? "single", targets: c.basedOnTargets } : "nothing"} /></div>
-                  <div><h3>After</h3><Json value={c.operation === "rollback" ? `the binding of revision ${c.toRevision}, exactly as Resolver recorded it` : c.binding} /></div>
+                  <div><h3>Before</h3><Json label="Binding before" value={c.basedOnTargets.length ? { strategy: c.basedOnStrategy ?? "single", targets: c.basedOnTargets } : "nothing"} /></div>
+                  <div><h3>After</h3><Json label="Binding after" value={c.operation === "rollback" ? `the binding of revision ${c.toRevision}, exactly as Resolver recorded it` : c.binding} /></div>
                 </div>
               </Card>
               <Card title={<>Impact <Basis kind="derived" /></>} subtitle={`Assessed ${when(c.impact.computedAt)}, when proposed`}>
                 <ul className="list tight">{c.impact.differences.map((d, i) => <li key={i}>{d}</li>)}</ul>
-                <dl className="facts">
-                  <dt>Environment</dt><dd>{c.environment} {c.impact.protected && <Badge status="warning" label="protected" />}</dd>
-                  <dt>Criticality</dt><dd><Badge status={c.impact.criticality} /> · <Badge status={c.impact.changeClass} /></dd>
-                  <dt>Consumers <Basis kind="declared" /></dt><dd>{c.impact.declaredConsumers.length ? c.impact.declaredConsumers.map((x) => x.application).join(", ") : <span className="muted">none declared</span>}</dd>
-                  {c.impact.observedRelationships.length > 0 && <><dt>Related <Basis kind="observed" /></dt><dd>{c.impact.observedRelationships.map((r) => <div key={r.ref}><Ref value={r.ref} /> <span className="muted small">{r.relation}</span></div>)}</dd></>}
-                  <dt>Fallback</dt><dd>{c.impact.fallback}</dd>
-                  <dt>Propagation</dt><dd className="small">{c.impact.propagation}</dd>
-                </dl>
-                {c.impact.warnings.length > 0 && <ul className="list tight warn-list">{c.impact.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
-                <details><summary className="small">Unknown ({c.impact.unknowns.length})</summary><ul className="list tight muted small">{c.impact.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul></details>
+                <MetadataList
+                  items={[
+                    { label: "Environment", value: <>{c.environment}{c.impact.protected && <span className="chip">protected</span>}</> },
+                    { label: "Criticality", value: <><State field="resolver-control.dependency.criticality" value={c.impact.criticality} /> · <State field="resolver-control.dependency.change_class" value={c.impact.changeClass} /></> },
+                    { label: <>Consumers <Basis kind="declared" /></>, value: c.impact.declaredConsumers.length ? c.impact.declaredConsumers.map((x) => x.application).join(", ") : "none declared" },
+                    ...(c.impact.observedRelationships.length ? [{ label: <>Related <Basis kind="observed" /></>, value: <>{c.impact.observedRelationships.map((r) => <div key={r.ref}><Ref value={r.ref} /> <span className="small muted">{r.relation}</span></div>)}</> }] : []),
+                    { label: "Fallback", value: c.impact.fallback },
+                    { label: "Propagation", value: c.impact.propagation },
+                  ]}
+                />
+                {c.impact.warnings.length > 0 && <Alert tone="attention" title="Warnings"><ul className="list tight">{c.impact.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></Alert>}
+                <details><summary className="small">Unknown ({c.impact.unknowns.length})</summary><ul className="list tight small muted">{c.impact.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul></details>
               </Card>
             </div>
 
-            <Card title="Validation" subtitle={c.validation ? `By ${c.validation.by} ${when(c.validation.at)}, against Resolver` : "Waiting for the resolver component"}>
-              {!c.validation ? <Empty>Not validated yet.</Empty> : <Checks checks={c.validation.checks} />}
-            </Card>
+            {c.validation ? (
+              <Checks title="Validation" outcome={<StatusIndicator tone={c.validation.passed ? "positive" : "critical"} label={c.validation.passed ? "Passed" : "Failed"} />} source={`Checked by ${c.validation.by} against Resolver`} at={c.validation.at} checks={c.validation.checks} />
+            ) : (
+              <Card title="Validation"><Empty title="Not validated yet">Waiting for the resolver component.</Empty></Card>
+            )}
 
             <div className="grid-2">
               <Card title="Approvals" subtitle={`${c.approvals.length} of ${c.impact.requiredApprovals} required at proposal; ${requiredApprovals} under the policy now`}>
-                {c.approvals.length === 0 ? <Empty>None yet.</Empty> : <ul className="list">{c.approvals.map((a) => <li key={a.by}><strong>{a.by}</strong> <span className="muted small">{exact(a.at)}</span>{a.note && <div className="small">{a.note}</div>}</li>)}</ul>}
-                {c.decision && <p><Badge status={c.decision.outcome} /> by {c.decision.by} {when(c.decision.at)}{c.decision.note && `: ${c.decision.note}`}</p>}
+                {c.approvals.length === 0 ? <Empty title="None yet" /> : <ul className="list">{c.approvals.map((a) => <li key={a.by}><strong>{a.by}</strong> <span className="small muted">{exact(a.at)}</span>{a.note && <div className="small">{a.note}</div>}</li>)}</ul>}
+                {c.decision && <p><State field="resolver-control.change.status" value={c.decision.outcome} /> by {c.decision.by} {when(c.decision.at)}{c.decision.note && `: ${c.decision.note}`}</p>}
               </Card>
               <Card title={<>Execution <Basis kind="observed" /></>} subtitle={c.execution ? `Attempt ${c.execution.attempt} by ${c.execution.claimedBy}` : "Not executed"}>
-                {!c.execution ? <Empty>{c.status === "approved" ? (policy.frozen ? "Approved, held: the environment is frozen." : "Approved; the resolver component executes it on its next pass.") : "Nothing has been sent to Resolver."}</Empty> : (
-                  <dl className="facts">
-                    <dt>Started</dt><dd>{exact(c.execution.claimedAt)}</dd>
-                    {c.execution.finishedAt && <><dt>Finished</dt><dd>{exact(c.execution.finishedAt)}</dd></>}
-                    {c.execution.resolverRevision !== undefined && <><dt>Resolver revision</dt><dd>{c.execution.resolverRevision}</dd></>}
-                    {c.execution.error && <><dt>Resolver said</dt><dd className="error-text">{c.execution.error.code}{c.execution.error.reason && ` (${c.execution.error.reason})`}: {c.execution.error.message}</dd></>}
-                    {c.execution.note && <><dt>Note</dt><dd>{c.execution.note}</dd></>}
-                  </dl>
+                {!c.execution ? (
+                  <Empty title={c.status === "approved" ? (policy.frozen ? "Approved, held: the environment is frozen" : "Approved; executes on the component's next pass") : "Nothing has been sent to Resolver"} />
+                ) : (
+                  <MetadataList
+                    items={[
+                      { label: "Started", value: exact(c.execution.claimedAt) },
+                      ...(c.execution.finishedAt ? [{ label: "Finished", value: exact(c.execution.finishedAt) }] : []),
+                      ...(c.execution.resolverRevision !== undefined ? [{ label: "Resolver revision", value: String(c.execution.resolverRevision), mono: true }] : []),
+                      ...(c.execution.error ? [{ label: "Resolver said", value: <span className="error-text">{c.execution.error.code}{c.execution.error.reason && ` (${c.execution.error.reason})`}: {c.execution.error.message}</span> }] : []),
+                      ...(c.execution.note ? [{ label: "Note", value: c.execution.note }] : []),
+                    ]}
+                  />
                 )}
               </Card>
             </div>
 
             {c.verification && (
-              <Card title={<>Verification <Basis kind="observed" /></>} subtitle={`${c.verification.passed ? "Passed" : "Did not pass"} ${exact(c.verification.at)} · written as revision ${c.verification.revision} by ${c.verification.actor ?? "?"} · Resolver now at ${c.verification.currentRevision}`}>
-                <Checks checks={c.verification.checks} />
-                {c.verification.selected !== undefined && <details><summary className="small">What consumers resolve now</summary><Json value={c.verification.selected} /></details>}
-              </Card>
+              <Checks
+                title="Verification"
+                outcome={<><StatusIndicator tone={c.verification.passed ? "positive" : "critical"} label={c.verification.passed ? "Verified" : "Not verified"} /> <span className="small summary">Written as revision {c.verification.revision} by <code>{c.verification.actor ?? "?"}</code>; Resolver now at {c.verification.currentRevision}.</span></>}
+                source="Checked by the resolver component against Resolver's history and a fresh resolution"
+                at={c.verification.at}
+                checks={c.verification.checks}
+              />
             )}
+            {c.verification?.selected !== undefined && <details><summary className="small">What consumers resolve now</summary><Json value={c.verification.selected} /></details>}
 
             <div className="row-actions">
-              {mine && ["proposed", "ready", "approved", "invalid"].includes(c.status) && <button className="btn ghost" onClick={() => attempt(app, () => cancel({ id: c.id }), "Withdrawn.")}>Withdraw</button>}
+              {mine && ["proposed", "ready", "approved", "invalid"].includes(c.status) && <Button label="Withdraw" variant="ghost" onClick={() => void attempt(app, () => cancel({ id: c.id }), "Withdrawn.")} />}
               {c.status === "verified" && c.basedOnRevision > 0 && can(app.permissions, "changes.propose") && (
-                <button className="btn ghost" onClick={async () => {
-                  const reason = window.prompt("Why revert this change?");
-                  if (!reason) return;
-                  const next = await attempt(app, () => revert({ id: c.id, reason }));
-                  if (next) go(`changes/${next.id}`);
-                }}>Propose revert</button>
+                <Button
+                  label="Propose revert"
+                  variant="secondary"
+                  onClick={async () => {
+                    const reason = await askReason(`Revert CHG-${c.number}`, `Proposes restoring revision ${c.basedOnRevision} of ${c.ref}. It is a new change with its own approval; history is kept.`, "Propose revert");
+                    if (!reason) return;
+                    const next = await attempt(app, () => revert({ id: c.id, reason }));
+                    if (next) go(`changes/${next.id}`);
+                  }}
+                />
               )}
             </div>
 
             <Card title="Audit trail">
-              <Live state={trail}>
-                {(events) => events.length === 0 ? <Empty>Nothing yet.</Empty> : (
-                  <ul className="timeline">
-                    {[...events].reverse().map((e) => (
-                      <li key={e.id}><span className="t-label">{EVENT_LABEL[e.type] ?? e.type}</span> <span className="muted small"><Actor id={e.actor} type={e.actorType} /> · {exact(e.at)} · <code title="AppPort request id">{e.requestId}</code></span></li>
-                    ))}
-                  </ul>
+              <Live state={trail} what="the audit trail">
+                {(events) => (
+                  <ActivityTimeline
+                    label="Audit trail"
+                    emptyTitle="Nothing yet"
+                    items={[...events].reverse().map((e) => ({ id: e.id, at: e.at, actor: <Actor id={e.actor} type={e.actorType} />, summary: EVENT_LABEL[e.type] ?? e.type, detail: <code title="AppPort request id">{e.requestId}</code> }))}
+                  />
                 )}
               </Live>
             </Card>
@@ -182,17 +226,5 @@ export function ChangeDetail({ id }: { id: string }) {
         );
       }}
     </Live>
-  );
-}
-
-function Checks({ checks }: { checks: Array<{ id: string; label: string; outcome: string; detail: string }> }) {
-  return (
-    <table className="table compact">
-      <tbody>
-        {checks.map((k) => (
-          <tr key={k.id}><td><Badge status={k.outcome} /></td><td><strong>{k.label}</strong><div className="muted small">{k.detail}</div></td></tr>
-        ))}
-      </tbody>
-    </table>
   );
 }

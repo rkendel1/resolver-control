@@ -23,6 +23,9 @@
     "@appport/resolver-client": "0.2.4",
     "@appport/resolver-core": "0.1.1",
     "@feltdb/feltkit": "0.3.25",
+    "@stack-ui/core": "^0.8.1",
+    "@stack-ui/react": "^0.8.1",
+    "@stack-ui/tokens": "^0.8.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },

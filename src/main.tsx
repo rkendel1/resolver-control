@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@feltdb/feltkit/client";
 import { FeltKitProvider } from "@feltdb/feltkit/react";
+import "@stack-ui/tokens/tokens.css";
+import "@stack-ui/core/core.css";
 import { App } from "./App";
 import "./styles.css";
 

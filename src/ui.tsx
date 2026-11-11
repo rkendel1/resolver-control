@@ -1,16 +1,29 @@
-/** Shared pieces: formatting, badges, provenance, permissions, routing, queries. */
+/**
+ * The application's UI vocabulary on top of the Stack design system (@stack-ui/react). Stack provides
+ * the components; this file keeps only what is Resolver Control's own: the mapping of its states onto
+ * Stack's tones, the provenance of a fact (observed, declared, derived), and a few app helpers.
+ */
 import { createContext, useContext, type ReactNode } from "react";
+import {
+  Breadcrumbs,
+  EmptyState,
+  ErrorPanel,
+  Loading,
+  PageHeader,
+  ResourceIdentity,
+  StatusIndicator,
+  type Tone,
+} from "@stack-ui/react";
 import type { FeltKitClientError } from "@feltdb/feltkit/react";
 
 export const when = (ms: number | undefined | null) => {
   if (!ms) return "—";
-  const d = new Date(ms);
   const diff = Date.now() - ms;
-  if (diff < 0) return d.toLocaleString();
+  if (diff < 0) return new Date(ms).toLocaleString();
   if (diff < 45_000) return "just now";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
-  return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 };
 export const exact = (ms: number | undefined | null) => (ms ? new Date(ms).toLocaleString() : "—");
 
@@ -19,69 +32,45 @@ export function can(granted: readonly string[], permission: string): boolean {
   return granted.some((g) => g === "*" || g === permission || (g.endsWith(".*") && permission.startsWith(g.slice(0, -1))));
 }
 
-const TONE: Record<string, string> = {
-  verified: "good",
-  ready: "info",
-  approved: "info",
-  executing: "info",
-  proposed: "warn",
-  unknown: "bad",
-  failed: "bad",
-  invalid: "bad",
-  superseded: "muted",
-  rejected: "muted",
-  cancelled: "muted",
-  governed: "good",
-  unregistered: "warn",
-  not_in_resolver: "muted",
-  not_visible: "bad",
-  active: "good",
-  revoked: "bad",
-  ok: "good",
-  error: "bad",
-  unconfigured: "warn",
-  pass: "good",
-  fail: "bad",
-  deferred: "muted",
-  action: "bad",
-  warning: "warn",
-  info: "info",
-  critical: "bad",
-  high: "warn",
-  medium: "info",
-  low: "muted",
-  runtime: "good",
-  adapter: "warn",
-  migration: "bad",
-  open: "warn",
-  adopted: "good",
-  dismissed: "muted",
+/**
+ * Resolver Control's source states on Stack's state vocabulary: one table per field, never per bare
+ * word. An unmapped value renders `unknown` with its own word, never a default of healthy.
+ */
+type Entry = Tone | [Tone, string];
+const P: Tone = "positive", G: Tone = "progress", A: Tone = "attention", C: Tone = "critical", N: Tone = "neutral", U: Tone = "unknown";
+export const STATES: Record<string, Record<string, Entry>> = {
+  "resolver-control.change.status": {
+    proposed: [G, "Awaiting validation"],
+    ready: [A, "Awaiting approval"],
+    approved: [G, "Approved · queued"],
+    executing: [G, "Executing"],
+    verified: [P, "Verified"],
+    failed: [C, "Failed"],
+    unknown: [U, "Outcome unknown"],
+    invalid: [C, "Invalid"],
+    superseded: [N, "Superseded"],
+    rejected: [N, "Rejected"],
+    cancelled: [N, "Withdrawn"],
+  },
+  "resolver-control.dependency.governance": { governed: [P, "Governed"], unregistered: [A, "Unregistered"], not_in_resolver: [N, "Not in Resolver"], not_visible: [C, "Not visible"] },
+  "resolver.reference.state": { active: [P, "Active"], revoked: [C, "Revoked"] },
+  "resolver-control.sync.state": { ok: [P, "Reachable"], error: [C, "Unreachable"], unconfigured: [A, "Not configured"] },
+  "resolver-control.check.outcome": { pass: [P, "Pass"], fail: [C, "Fail"], deferred: [U, "Deferred"] },
+  "resolver-control.finding.severity": { action: [C, "Action"], warning: [A, "Warning"], info: [N, "Info"] },
+  "resolver-control.dependency.criticality": { critical: [C, "Critical"], high: [A, "High"], medium: [N, "Medium"], low: [N, "Low"] },
+  "resolver-control.dependency.change_class": { runtime: [P, "Runtime switch"], adapter: [A, "Needs adapter"], migration: [C, "Needs migration"], unknown: [U, "Not assessed"] },
+  "resolver-control.candidate.status": { open: [A, "Open"], adopted: [P, "Adopted"], dismissed: [N, "Dismissed"] },
+  "resolver-control.comparison": { same: [P, "Same"], differs: [A, "Differs"] },
 };
 
-export const STATUS_LABEL: Record<string, string> = {
-  proposed: "awaiting validation",
-  ready: "awaiting approval",
-  approved: "approved · queued",
-  executing: "executing",
-  verified: "verified",
-  failed: "failed",
-  unknown: "outcome unknown",
-  invalid: "invalid",
-  superseded: "superseded",
-  rejected: "rejected",
-  cancelled: "withdrawn",
-  not_in_resolver: "not in Resolver",
-  not_visible: "not visible",
-  runtime: "runtime switch",
-  adapter: "needs adapter",
-  migration: "needs migration",
-};
-
-export function Badge({ status, label }: { status: string; label?: string }) {
-  return <span className={`badge ${TONE[status] ?? "muted"}`}>{label ?? STATUS_LABEL[status] ?? status.replace(/_/g, " ")}</span>;
+/** A state, through Stack's StatusIndicator (glyph and words, never colour alone). */
+export function State({ field, value, label, detail }: { field: string; value: string; label?: string; detail?: ReactNode }) {
+  const entry = STATES[field]?.[value];
+  const [tone, word] = entry === undefined ? [U, value.replace(/_/g, " ")] : typeof entry === "string" ? [entry, value.replace(/_/g, " ")] : entry;
+  return <StatusIndicator tone={tone} label={label ?? word} detail={detail} attrs={{ "data-field": field, "data-value": value }} />;
 }
 
-/** Where a fact came from. Every fact on screen carries one. */
+/** Where a fact came from. Every fact on screen carries one. (Stack has freshness, not provenance: proposed upstream.) */
 export function Basis({ kind }: { kind: "observed" | "declared" | "derived" | "unknown" }) {
   const title = {
     observed: "Read from Resolver by the resolver component, at the revision and time shown",
@@ -96,18 +85,9 @@ export function Basis({ kind }: { kind: "observed" | "declared" | "derived" | "u
   );
 }
 
-export function Kind({ kind }: { kind?: string }) {
-  return kind ? <span className={`kind kind-${kind}`}>{kind}</span> : <span className="muted">—</span>;
-}
-
-export function Ref({ value, link = true }: { value: string; link?: boolean }) {
-  return link ? (
-    <a className="ref" href={`#/dependencies/${encodeURIComponent(value)}`}>
-      {value}
-    </a>
-  ) : (
-    <code className="ref">{value}</code>
-  );
+/** A reference name, linked to its page. */
+export function Ref({ value, kind, link = true }: { value: string; kind?: string; link?: boolean }) {
+  return <ResourceIdentity name={value} {...(kind ? { kind } : {})} {...(link ? { href: `#/dependencies/${encodeURIComponent(value)}` } : {})} />;
 }
 
 export function Actor({ id, type }: { id: string; type?: string }) {
@@ -120,6 +100,7 @@ export function Actor({ id, type }: { id: string; type?: string }) {
   );
 }
 
+/** A titled container. Stack has no panel component; this one uses its tokens. */
 export function Card({ title, actions, children, className, subtitle }: { title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={`panel ${className ?? ""}`}>
@@ -137,23 +118,22 @@ export function Card({ title, actions, children, className, subtitle }: { title?
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <div className="empty-row muted">{children}</div>;
+export function Empty({ title, children }: { title: string; children?: ReactNode }) {
+  return <EmptyState title={title} body={children} headingLevel={3} />;
 }
 
-export function Json({ value }: { value: unknown }) {
-  return <pre className="json">{JSON.stringify(value, null, 2)}</pre>;
+export function Json({ value, label = "JSON" }: { value: unknown; label?: string }) {
+  // Scrollable, so it must be reachable and named for keyboard and screen-reader users.
+  return <pre className="json" tabIndex={0} role="region" aria-label={label}>{JSON.stringify(value, null, 2)}</pre>;
 }
 
-export function PageHead({ title, children, actions }: { title: ReactNode; children?: ReactNode; actions?: ReactNode }) {
+/** A page's header, with breadcrumbs when it is below a section. */
+export function PageHead({ title, crumbs, children, actions, status }: { title: ReactNode; crumbs?: Array<{ label: ReactNode; href?: string }>; children?: ReactNode; actions?: ReactNode; status?: ReactNode }) {
   return (
-    <header className="page-head">
-      <div>
-        <h1>{title}</h1>
-        {children && <p className="lede">{children}</p>}
-      </div>
-      {actions && <div className="page-actions">{actions}</div>}
-    </header>
+    <div className="page-head">
+      {crumbs && <Breadcrumbs items={[...crumbs, { label: title }]} />}
+      <PageHeader title={title} {...(children ? { description: children } : {})} {...(actions ? { actions } : {})} {...(status ? { status } : {})} />
+    </div>
   );
 }
 
@@ -190,11 +170,22 @@ export async function attempt<T>(app: AppContext, fn: () => Promise<T>, done?: s
   }
 }
 
-/** A live query rendered with its loading and error states: never a blank or a guess. */
-export function Live<T>({ state, children }: { state: { data: T | undefined; error?: unknown }; children: (data: T) => ReactNode }) {
-  if (state.error) return <div className="empty-row error-text">{describe(state.error)}</div>;
-  if (state.data === undefined) return <div className="empty-row muted">Loading…</div>;
+/** A live query rendered with Stack's loading and error states: never a blank or a guess. */
+export function Live<T>({ state, what, children }: { state: { data: T | undefined; error?: unknown }; what?: string; children: (data: T) => ReactNode }) {
+  if (state.error) {
+    const e = state.error as FeltKitClientError;
+    return <ErrorPanel title="Could not load this" message={describe(e)} {...(e?.code ? { code: e.code } : {})} {...(e?.requestId ? { requestId: e.requestId } : {})} />;
+  }
+  if (state.data === undefined) return <Loading what={what ?? "this page"} />;
   return <>{children(state.data)}</>;
+}
+
+/** Asks for a reason in an accessible dialog (Stack's formDialog), instead of window.prompt. */
+export async function askReason(title: string, description: string, submitLabel: string, initial = ""): Promise<string | null> {
+  const { formDialog } = await import("@stack-ui/react");
+  const values = await formDialog({ title, description, submitLabel, cancelLabel: "Cancel", fields: [{ name: "reason", label: "Reason", required: true, multiline: true, rows: 3, value: initial }] });
+  const reason = values?.["reason"]?.trim();
+  return reason ? reason : null;
 }
 
 export const EVENT_LABEL: Record<string, string> = {

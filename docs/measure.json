@@ -25,8 +25,8 @@
       "lines": 1473
     },
     "experience": {
-      "files": 16,
-      "lines": 1597
+      "files": 14,
+      "lines": 1539
     },
     "infrastructure": {
       "files": 4,
@@ -38,7 +38,7 @@
     },
     "configuration": {
       "files": 5,
-      "lines": 66
+      "lines": 84
     },
     "tests": {
       "files": 9,
@@ -54,7 +54,7 @@
     },
     "excluded": {
       "files": 8,
-      "lines": 4315
+      "lines": 4352
     },
     "unclassified": {
       "files": 0,
@@ -62,8 +62,8 @@
     }
   },
   "authored": {
-    "files": 37,
-    "lines": 3763
+    "files": 35,
+    "lines": 3723
   },
   "definitions": {
     "app": {
@@ -135,6 +135,11 @@
       "files": 1
     },
     {
+      "api": "@feltdb/feltkit/react FeltKitClientError",
+      "callSites": 2,
+      "files": 1
+    },
+    {
       "api": "@feltdb/feltkit/react FeltKitProvider",
       "callSites": 2,
       "files": 1
@@ -151,11 +156,6 @@
     },
     {
       "api": "@feltdb/feltkit/client createClient",
-      "callSites": 1,
-      "files": 1
-    },
-    {
-      "api": "@feltdb/feltkit/react FeltKitClientError",
       "callSites": 1,
       "files": 1
     },
@@ -366,13 +366,13 @@
       "path": "package-lock.json",
       "class": "excluded",
       "basis": "lockfile",
-      "lines": 4315
+      "lines": 4352
     },
     {
       "path": "package.json",
       "class": "configuration",
       "basis": "configuration file",
-      "lines": 37
+      "lines": 40
     },
     {
       "path": "public/apple-touch-icon.png",
@@ -393,12 +393,6 @@
       "lines": 0
     },
     {
-      "path": "public/theme.js",
-      "class": "experience",
-      "basis": "path: public/ (UI)",
-      "lines": 4
-    },
-    {
       "path": "scripts/demo.mjs",
       "class": "infrastructure",
       "basis": "path: scripts/ (app tooling)",
@@ -414,19 +408,19 @@
       "path": "src/App.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 154
+      "lines": 148
     },
     {
       "path": "src/main.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 14
+      "lines": 16
     },
     {
       "path": "src/screens/Activity.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 33
+      "lines": 34
     },
     {
       "path": "src/screens/Approvals.tsx",
@@ -438,25 +432,25 @@
       "path": "src/screens/Changes.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 184
+      "lines": 213
     },
     {
       "path": "src/screens/Dependencies.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 392
+      "lines": 436
     },
     {
       "path": "src/screens/Discovery.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 49
+      "lines": 63
     },
     {
       "path": "src/screens/Environments.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 91
+      "lines": 94
     },
     {
       "path": "src/screens/Insights.tsx",
@@ -468,31 +462,25 @@
       "path": "src/screens/Overview.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 117
+      "lines": 108
     },
     {
       "path": "src/screens/Settings.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 57
+      "lines": 69
     },
     {
       "path": "src/styles.css",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 183
-    },
-    {
-      "path": "src/theme.tsx",
-      "class": "experience",
-      "basis": "path: src/ (UI)",
-      "lines": 46
+      "lines": 107
     },
     {
       "path": "src/ui.tsx",
       "class": "experience",
       "basis": "path: src/ (UI)",
-      "lines": 208
+      "lines": 186
     },
     {
       "path": "tests/agents.test.ts",
@@ -540,7 +528,7 @@
       "path": "vite.config.ts",
       "class": "configuration",
       "basis": "configuration file",
-      "lines": 5
+      "lines": 20
     }
   ]
 }
