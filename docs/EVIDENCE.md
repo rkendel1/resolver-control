@@ -76,15 +76,24 @@ consumers, policy, approvals, impact, verification evidence and discovery.
 
 ## Custom code
 
-Non-blank lines, counted from this repository:
+Measured by `feltkit measure` (FeltKit 0.3.25). The report is kept at [measure.json](measure.json), declarations
+and their reasons are in `feltkit.measure.json`, and `npm run measure:check` fails if the report goes stale or any
+code file is unclassified.
 
-| Area | Lines | Notes |
-|---|---|---|
-| Domain logic (`feltkit/`, excluding generated) | 1,608 | `changes.ts` 412, `app.ts` 265 (declarations), `catalog.ts` 244, `_rules.ts` 201 (pure rules) |
-| Resolver component (`component/`) | 431 | The only Resolver I/O |
-| Frontend (`src/`) | 1,594 | Including CSS |
-| Scripts and example consumer | 306 | Demo, discovery scanner, consumer app |
-| Tests (unit, e2e, artifact) | 787 | |
+| Class | Lines | What it is here |
+|---|--:|---|
+| domain (`feltkit/`) | 1,473 | Collections, the change lifecycle, policy, impact rules, insights, discovery intake |
+| experience (`src/`, `public/`) | 1,597 | The UI (before the `@stack-ui` migration) |
+| infrastructure | 627 | `component/` (the Resolver adapter, 431) and `scripts/` (demo, discovery scanner) |
+| configuration | 66 | |
+| **authored** | **3,763** | |
+| tests | 747 | Unit, e2e, artifact, example consumer |
+
+No infrastructure finding: the audit trail is FeltKit's `app.auditTrail` (it was the one finding before 0.3.25).
+`component/` is classified as infrastructure on purpose. It exists because the guest has no network and FeltKit
+integrations cannot resolve through Resolver yet (FeltKit GAP-08). It is plumbing this application owns, not domain.
+No scaffold manifest exists (the app was created with create-feltkit 0.3.24, before manifests), so scaffolded files
+are counted by path.
 
 What this code is **not**: a store, a permission system, a vault, a resolution engine, an API server, a
 deployment pipeline or a sidecar. One process under FeltKit, one artifact for AppBoundry.

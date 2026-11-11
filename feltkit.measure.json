@@ -1,0 +1,8 @@
+{
+  "report": "docs/measure.json",
+  "classify": [
+    { "path": "component/**", "class": "infrastructure", "reason": "The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key." },
+    { "path": "examples/**", "class": "tests", "reason": "A consuming application used by the e2e to prove a running consumer follows a governed change without restart." },
+    { "path": "artifact-tests/**", "class": "tests", "reason": "Runs the change lifecycle through the compiled AppBoundry artifact." }
+  ]
+}

@@ -1,0 +1,546 @@
+{
+  "schema": "feltkit.measure/1",
+  "app": {
+    "name": "resolver-control",
+    "feltkit": "0.3.25",
+    "installed": "0.3.25"
+  },
+  "method": {
+    "files": "git ls-files (tracked, and untracked files that are not ignored); node_modules, dist, .feltkit and .git are never counted",
+    "lines": "lines that are not blank and not only a comment; JSON/YAML/TOML count non-blank lines; assets and documentation count 0",
+    "consumption": "static call sites of ctx.* and of names imported from @feltdb/feltkit, in authored code and tests",
+    "findings": "static patterns in authored code; a finding is a candidate for review, not a verdict"
+  },
+  "provenance": {
+    "scaffold": null,
+    "generated": {
+      "file": "feltkit/_generated/api.ts",
+      "current": true
+    },
+    "skills": []
+  },
+  "totals": {
+    "domain": {
+      "files": 12,
+      "lines": 1473
+    },
+    "experience": {
+      "files": 16,
+      "lines": 1597
+    },
+    "infrastructure": {
+      "files": 4,
+      "lines": 627
+    },
+    "generated": {
+      "files": 1,
+      "lines": 12
+    },
+    "configuration": {
+      "files": 5,
+      "lines": 66
+    },
+    "tests": {
+      "files": 9,
+      "lines": 747
+    },
+    "third-party": {
+      "files": 0,
+      "lines": 0
+    },
+    "platform": {
+      "files": 0,
+      "lines": 0
+    },
+    "excluded": {
+      "files": 8,
+      "lines": 4315
+    },
+    "unclassified": {
+      "files": 0,
+      "lines": 0
+    }
+  },
+  "authored": {
+    "files": 37,
+    "lines": 3763
+  },
+  "definitions": {
+    "app": {
+      "auditTrail": 1,
+      "collection": 8,
+      "mutation": 25,
+      "query": 14
+    },
+    "collections": [
+      "settings",
+      "syncStatus",
+      "dependencies",
+      "observations",
+      "consumers",
+      "policies",
+      "changes",
+      "candidates"
+    ]
+  },
+  "consumption": [
+    {
+      "api": "@feltdb/feltkit s",
+      "callSites": 583,
+      "files": 11
+    },
+    {
+      "api": "ctx.db",
+      "callSites": 110,
+      "files": 9
+    },
+    {
+      "api": "@feltdb/feltkit fail",
+      "callSites": 54,
+      "files": 5
+    },
+    {
+      "api": "@feltdb/feltkit/react useQueryState",
+      "callSites": 21,
+      "files": 10
+    },
+    {
+      "api": "@feltdb/feltkit/react useMutation",
+      "callSites": 16,
+      "files": 5
+    },
+    {
+      "api": "ctx.auth",
+      "callSites": 15,
+      "files": 6
+    },
+    {
+      "api": "@feltdb/feltkit MutationCtx",
+      "callSites": 6,
+      "files": 3
+    },
+    {
+      "api": "@feltdb/feltkit/testing createTestApp",
+      "callSites": 4,
+      "files": 3
+    },
+    {
+      "api": "@feltdb/feltkit QueryCtx",
+      "callSites": 3,
+      "files": 2
+    },
+    {
+      "api": "@feltdb/feltkit feltkit",
+      "callSites": 2,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/react FeltKitProvider",
+      "callSites": 2,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/testing TestApp",
+      "callSites": 2,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit PrincipalInput",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/client createClient",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/react FeltKitClientError",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/react useConnectionState",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/react useSession",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/server ComponentHealth",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/server defineComponent",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/testing Caller",
+      "callSites": 1,
+      "files": 1
+    },
+    {
+      "api": "@feltdb/feltkit/testing createArtifactTestApp",
+      "callSites": 1,
+      "files": 1
+    }
+  ],
+  "findings": [],
+  "checks": [
+    {
+      "name": "generated code current",
+      "ok": true,
+      "detail": "feltkit/_generated/api.ts matches what codegen writes",
+      "fix": "npx feltkit codegen"
+    },
+    {
+      "name": "declarations match files",
+      "ok": true,
+      "detail": "3 declaration(s), each matches a file",
+      "fix": "Remove or correct the stale entries in feltkit.measure.json."
+    },
+    {
+      "name": "every code file classified",
+      "ok": true,
+      "detail": "every file with code has a class",
+      "fix": "Declare them in feltkit.measure.json with a class and a reason."
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "class": "configuration",
+      "basis": "configuration file",
+      "lines": 0
+    },
+    {
+      "path": "README.md",
+      "class": "excluded",
+      "basis": "documentation",
+      "lines": 0
+    },
+    {
+      "path": "artifact-tests/artifact.test.ts",
+      "class": "tests",
+      "basis": "declared: Runs the change lifecycle through the compiled AppBoundry artifact.",
+      "lines": 53
+    },
+    {
+      "path": "component/engine.ts",
+      "class": "infrastructure",
+      "basis": "declared: The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key.",
+      "lines": 329
+    },
+    {
+      "path": "component/resolver.ts",
+      "class": "infrastructure",
+      "basis": "declared: The application's own adapter to Resolver: the WebAssembly guest has no network and FeltKit integrations cannot resolve through Resolver yet (FeltKit GAP-08), so this component is the only code that calls Resolver and holds its key.",
+      "lines": 65
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "class": "excluded",
+      "basis": "documentation",
+      "lines": 0
+    },
+    {
+      "path": "docs/EVIDENCE.md",
+      "class": "excluded",
+      "basis": "documentation",
+      "lines": 0
+    },
+    {
+      "path": "docs/PLATFORM-GAPS.md",
+      "class": "excluded",
+      "basis": "documentation",
+      "lines": 0
+    },
+    {
+      "path": "e2e/processes.test.mjs",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 114
+    },
+    {
+      "path": "examples/consumer-app.mjs",
+      "class": "tests",
+      "basis": "declared: A consuming application used by the e2e to prove a running consumer follows a governed change without restart.",
+      "lines": 32
+    },
+    {
+      "path": "feltkit.measure.json",
+      "class": "configuration",
+      "basis": "configuration file",
+      "lines": 8
+    },
+    {
+      "path": "feltkit/_audit.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 30
+    },
+    {
+      "path": "feltkit/_generated/api.ts",
+      "class": "generated",
+      "basis": "codegen (matches regeneration)",
+      "lines": 12
+    },
+    {
+      "path": "feltkit/_rules.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 184
+    },
+    {
+      "path": "feltkit/activity.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 13
+    },
+    {
+      "path": "feltkit/app.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 204
+    },
+    {
+      "path": "feltkit/catalog.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 234
+    },
+    {
+      "path": "feltkit/changes.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 390
+    },
+    {
+      "path": "feltkit/demo.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 61
+    },
+    {
+      "path": "feltkit/discovery.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 60
+    },
+    {
+      "path": "feltkit/insights.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 118
+    },
+    {
+      "path": "feltkit/observations.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 77
+    },
+    {
+      "path": "feltkit/policies.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 52
+    },
+    {
+      "path": "feltkit/settings.ts",
+      "class": "domain",
+      "basis": "path: feltkit/ (server functions)",
+      "lines": 50
+    },
+    {
+      "path": "index.html",
+      "class": "experience",
+      "basis": "path: root (UI)",
+      "lines": 16
+    },
+    {
+      "path": "package-lock.json",
+      "class": "excluded",
+      "basis": "lockfile",
+      "lines": 4315
+    },
+    {
+      "path": "package.json",
+      "class": "configuration",
+      "basis": "configuration file",
+      "lines": 37
+    },
+    {
+      "path": "public/apple-touch-icon.png",
+      "class": "excluded",
+      "basis": "asset",
+      "lines": 0
+    },
+    {
+      "path": "public/favicon.png",
+      "class": "excluded",
+      "basis": "asset",
+      "lines": 0
+    },
+    {
+      "path": "public/feltkit-mark.png",
+      "class": "excluded",
+      "basis": "asset",
+      "lines": 0
+    },
+    {
+      "path": "public/theme.js",
+      "class": "experience",
+      "basis": "path: public/ (UI)",
+      "lines": 4
+    },
+    {
+      "path": "scripts/demo.mjs",
+      "class": "infrastructure",
+      "basis": "path: scripts/ (app tooling)",
+      "lines": 69
+    },
+    {
+      "path": "scripts/discover.mjs",
+      "class": "infrastructure",
+      "basis": "path: scripts/ (app tooling)",
+      "lines": 164
+    },
+    {
+      "path": "src/App.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 154
+    },
+    {
+      "path": "src/main.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 14
+    },
+    {
+      "path": "src/screens/Activity.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 33
+    },
+    {
+      "path": "src/screens/Approvals.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 17
+    },
+    {
+      "path": "src/screens/Changes.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 184
+    },
+    {
+      "path": "src/screens/Dependencies.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 392
+    },
+    {
+      "path": "src/screens/Discovery.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 49
+    },
+    {
+      "path": "src/screens/Environments.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 91
+    },
+    {
+      "path": "src/screens/Insights.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 32
+    },
+    {
+      "path": "src/screens/Overview.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 117
+    },
+    {
+      "path": "src/screens/Settings.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 57
+    },
+    {
+      "path": "src/styles.css",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 183
+    },
+    {
+      "path": "src/theme.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 46
+    },
+    {
+      "path": "src/ui.tsx",
+      "class": "experience",
+      "basis": "path: src/ (UI)",
+      "lines": 208
+    },
+    {
+      "path": "tests/agents.test.ts",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 85
+    },
+    {
+      "path": "tests/failures.test.ts",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 249
+    },
+    {
+      "path": "tests/fixtures/resolver-service.d.mts",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 3
+    },
+    {
+      "path": "tests/fixtures/resolver-service.mjs",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 18
+    },
+    {
+      "path": "tests/helpers.ts",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 73
+    },
+    {
+      "path": "tests/lifecycle.test.ts",
+      "class": "tests",
+      "basis": "path: tests",
+      "lines": 120
+    },
+    {
+      "path": "tsconfig.json",
+      "class": "configuration",
+      "basis": "configuration file",
+      "lines": 16
+    },
+    {
+      "path": "vite.config.ts",
+      "class": "configuration",
+      "basis": "configuration file",
+      "lines": 5
+    }
+  ]
+}

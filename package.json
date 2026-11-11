@@ -15,7 +15,9 @@
     "build:app": "feltkit build --target appboundry",
     "discover": "node scripts/discover.mjs",
     "test:artifact": "feltkit build --target appboundry && node --import tsx --test artifact-tests/*.test.ts",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "measure": "feltkit measure",
+    "measure:check": "feltkit measure --check"
   },
   "dependencies": {
     "@appport/resolver-client": "0.2.4",
