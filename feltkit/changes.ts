@@ -232,7 +232,8 @@ export const get = app.query({
     return {
       change,
       policy: { protected: policy.protected, approvalsRequired: policy.approvalsRequired, frozen: policy.frozen, explicit: policy.explicit },
-      requiredApprovals: requiredApprovals(policy, dependency?.criticality ?? "medium"),
+      // What the approval signer enforces: never below the threshold recorded at proposal (contract §4).
+      requiredApprovals: Math.max(change.impact.requiredApprovals, requiredApprovals(policy, dependency?.criticality ?? "medium")),
       currentRevision: current?.revision ?? null,
     };
   },
@@ -251,14 +252,16 @@ export const approve = app.mutation({
     if (change.proposedBy === who.id) fail("FORBIDDEN", "The proposer of a change may not approve it.");
     if (change.approvals.some((a) => a.by === who.id)) fail("FAILED_PRECONDITION", `You already approved CHG-${change.number}; another person must.`);
     const policy = await policyFor(ctx, change.environment);
-    if (policy.protected && !ctx.auth.has("changes.approve.protected")) fail("FORBIDDEN", `${change.environment} is protected: approving needs changes.approve.protected.`);
+    // Ratchet (Boundry governance contract §4): protection recorded at proposal still applies if lowered since.
+    if ((policy.protected || change.impact.protected) && !ctx.auth.has("changes.approve.protected")) fail("FORBIDDEN", `${change.environment} is protected: approving needs changes.approve.protected.`);
     if (policy.frozen) fail("FAILED_PRECONDITION", `${change.environment} is frozen${policy.freezeReason ? `: ${policy.freezeReason}` : ""}.`);
     const current = await observed(ctx, change.ref);
     if (current && current.revision !== change.basedOnRevision) {
       fail("FAILED_PRECONDITION", `${change.ref} moved to revision ${current.revision} since CHG-${change.number} was proposed at ${change.basedOnRevision}. The resolver component marks it superseded; propose again against the current resolution.`);
     }
     const dependency = (await ctx.db.find(dependencies, { ref: change.ref }, { limit: 1 }))[0];
-    const required = requiredApprovals(policy, dependency?.criticality ?? "medium");
+    // Ratchet (contract §4): lowering criticality or the policy never lowers what an open change needs.
+    const required = Math.max(change.impact.requiredApprovals, requiredApprovals(policy, dependency?.criticality ?? "medium"));
     const approvals = [...change.approvals, { by: who.id, at: Date.now(), ...(note ? { note } : {}) }];
     const status = approvals.length >= required ? "approved" : "ready";
     await ctx.db.patch(changes, id, { approvals, status, updatedAt: Date.now() });
@@ -379,7 +382,7 @@ export const claim = app.mutation({
       const policy = await policyFor(ctx, change.environment);
       if (policy.frozen) fail("FAILED_PRECONDITION", `${change.environment} is frozen; CHG-${change.number} waits.`);
       const dependency = (await ctx.db.find(dependencies, { ref: change.ref }, { limit: 1 }))[0];
-      const required = requiredApprovals(policy, dependency?.criticality ?? "medium");
+      const required = Math.max(change.impact.requiredApprovals, requiredApprovals(policy, dependency?.criticality ?? "medium")); // ratchet, contract §4
       if (change.approvals.length < required) {
         await ctx.db.patch(changes, id, { status: "ready", updatedAt: now });
         await record(ctx, "change", id, "change.needs_more_approvals", { number: change.number, approvals: change.approvals.length, required });

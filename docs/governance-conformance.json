@@ -1,0 +1,215 @@
+{
+  "contract": "boundry.governance@1.1.0",
+  "vendoredFrom": {
+    "repository": "rkendel1/boundry-maint",
+    "path": "contracts/governance/v1",
+    "commit": "2cc2e2f688c39aa5cd2c9228a9becf9d2bb8fd9c"
+  },
+  "cases": [
+    {
+      "name": "engineer may propose",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "agent may propose",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "component may not propose",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "approver without propose may not propose",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "unknown principal is refused",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"unknown-principal\"}, got {\"allow\":false,\"code\":\"unknown-principal\"}"
+    },
+    {
+      "name": "prod approver approves a protected proposal",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true,\"result\":\"approved\"}, got {\"allow\":true,\"result\":\"approved\"}"
+    },
+    {
+      "name": "agent never approves",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"person-only\",\"codes\":[\"person-only\",\"forbidden-effect\"]}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "component never approves",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"person-only\",\"codes\":[\"person-only\",\"forbidden-effect\"]}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "proposer may not approve",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"proposer-cannot-approve\"}, got {\"allow\":false,\"code\":\"proposer-cannot-approve\"}"
+    },
+    {
+      "name": "no double approval",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"already-approved\"}, got {\"allow\":false,\"code\":\"already-approved\"}"
+    },
+    {
+      "name": "approver role is not enough in a protected scope",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"protected-scope\"}, got {\"allow\":false,\"code\":\"protected-scope\"}"
+    },
+    {
+      "name": "approver role suffices when unprotected",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true,\"result\":\"approved\"}, got {\"allow\":true,\"result\":\"approved\"}"
+    },
+    {
+      "name": "frozen scope refuses approval",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"frozen\"}, got {\"allow\":false,\"code\":\"frozen\"}"
+    },
+    {
+      "name": "approval names another digest",
+      "outcome": "not-applicable",
+      "detail": "approvals here bind the change record itself; there is no separate digest argument (a moved reference supersedes the change instead)."
+    },
+    {
+      "name": "only a proposal awaiting approval can be approved",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"wrong-state\"}, got {\"allow\":false,\"code\":\"wrong-state\"}"
+    },
+    {
+      "name": "critical needs two: first approval leaves it awaiting",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true,\"result\":\"awaiting-approval\"}, got {\"allow\":true,\"result\":\"awaiting-approval\"}"
+    },
+    {
+      "name": "critical needs two: second distinct approval approves",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true,\"result\":\"approved\"}, got {\"allow\":true,\"result\":\"approved\"}"
+    },
+    {
+      "name": "policy count above two is honoured for critical",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true,\"result\":\"awaiting-approval\"}, got {\"allow\":true,\"result\":\"awaiting-approval\"}"
+    },
+    {
+      "name": "not in the eligible list",
+      "outcome": "not-applicable",
+      "detail": "Resolver Control has no per-change approver allowlist; eligibility is the role."
+    },
+    {
+      "name": "proposer withdraws (an agent, its own proposal)",
+      "outcome": "DOES NOT CONFORM (known)",
+      "detail": "the agent role lacks changes.cancel, so an agent cannot withdraw its own proposal (contract 1.1.0 allows it). Changing roles is a product decision for this application; not made here. expected {\"allow\":true}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "approver rejects",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "engineer who did not propose may not withdraw",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "nothing is withdrawn after the irreversible step",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"irreversible\"}, got {\"allow\":false,\"code\":\"irreversible\"}"
+    },
+    {
+      "name": "admin triggers",
+      "outcome": "not-applicable",
+      "detail": "Resolver Control has no trigger: its component claims approved changes itself (changes.work / claim)."
+    },
+    {
+      "name": "agent never triggers",
+      "outcome": "not-applicable",
+      "detail": "Resolver Control has no trigger: its component claims approved changes itself (changes.work / claim)."
+    },
+    {
+      "name": "engineer cannot trigger",
+      "outcome": "not-applicable",
+      "detail": "Resolver Control has no trigger: its component claims approved changes itself (changes.work / claim)."
+    },
+    {
+      "name": "approved and valid: execute",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "only a component executes",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "frozen after approval: waits",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"frozen\",\"result\":\"wait\"}, got {\"allow\":false,\"code\":\"frozen\",\"result\":\"wait\"}"
+    },
+    {
+      "name": "policy tightened after approval: back to awaiting approval",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"insufficient-approvals\",\"result\":\"awaiting-approval\"}, got {\"allow\":false,\"code\":\"insufficient-approvals\",\"result\":\"awaiting-approval\"}"
+    },
+    {
+      "name": "approvals for another digest do not count",
+      "outcome": "not-applicable",
+      "detail": "this subject cannot be constructed through the application: approve refuses non-person, proposer and duplicate approvals when they are given (contract §3), and the approval signer re-checks them before signing."
+    },
+    {
+      "name": "an approval by the proposer never counts",
+      "outcome": "not-applicable",
+      "detail": "this subject cannot be constructed through the application: approve refuses non-person, proposer and duplicate approvals when they are given (contract §3), and the approval signer re-checks them before signing."
+    },
+    {
+      "name": "an approval recorded for a non-person never counts",
+      "outcome": "not-applicable",
+      "detail": "this subject cannot be constructed through the application: approve refuses non-person, proposer and duplicate approvals when they are given (contract §3), and the approval signer re-checks them before signing."
+    },
+    {
+      "name": "duplicate approvals by one person count once",
+      "outcome": "not-applicable",
+      "detail": "this subject cannot be constructed through the application: approve refuses non-person, proposer and duplicate approvals when they are given (contract §3), and the approval signer re-checks them before signing."
+    },
+    {
+      "name": "revoked: never executes",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"revoked\"}, got {\"allow\":false,\"code\":\"revoked\"}"
+    },
+    {
+      "name": "production with asserted approvals: refused",
+      "outcome": "not-applicable",
+      "detail": "authentication level is the platform's (FeltKit sessions); the harness cannot present an asserted identity to a production mutation."
+    },
+    {
+      "name": "production with signed approvals: execute",
+      "outcome": "not-applicable",
+      "detail": "authentication level is the platform's (FeltKit sessions); the harness cannot present an asserted identity to a production mutation."
+    },
+    {
+      "name": "non-production with asserted approvals: execute",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "criticality lowered after proposal does not lower the threshold (ratchet)",
+      "outcome": "not-applicable",
+      "detail": "not constructible through the API once the approval path applies the ratchet (one approval of a change proposed as critical never reaches approved); claim applies the same rule as defence in depth."
+    },
+    {
+      "name": "ratchet at approval: one approval of a subject proposed as critical leaves it awaiting",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true,\"result\":\"awaiting-approval\"}, got {\"allow\":true,\"result\":\"awaiting-approval\"}"
+    },
+    {
+      "name": "an agent may not withdraw someone else's proposal",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    }
+  ]
+}
