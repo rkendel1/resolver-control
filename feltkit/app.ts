@@ -34,9 +34,10 @@ export const app = feltkit({
     prod_approver: [...READ, "changes.approve", "changes.approve.protected"],
     // Administrators set policies (protection, approvals, freezes) and the Resolver connection.
     admin: [...READ, "catalog.write", "policies.write", "settings.write", "demo.seed"],
-    // Agents inspect, declare consumers, submit discovery findings and propose. Never approve or execute;
-    // the application also refuses an approval from any non-person principal, whatever its roles.
-    agent: [...READ, "consumers.write", "changes.propose", "discovery.write"],
+    // Agents inspect, declare consumers, submit discovery findings and propose, and may withdraw their OWN
+    // proposals before execution is claimed (cancel checks the proposer and the status). Never approve, reject,
+    // claim or execute; the application also refuses an approval from any non-person principal, whatever its roles.
+    agent: [...READ, "consumers.write", "changes.propose", "changes.cancel", "discovery.write"],
     // A consuming application may declare that it resolves a reference (and nothing else).
     consumer_app: ["catalog.read", "consumers.declare"],
     // The resolver component: records observations, validation and execution evidence; claims approved work.

@@ -103,8 +103,8 @@
     },
     {
       "name": "proposer withdraws (an agent, its own proposal)",
-      "outcome": "DOES NOT CONFORM (known)",
-      "detail": "the agent role lacks changes.cancel, so an agent cannot withdraw its own proposal (contract 1.1.0 allows it). Changing roles is a product decision for this application; not made here. expected {\"allow\":true}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
     },
     {
       "name": "approver rejects",

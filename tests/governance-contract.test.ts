@@ -39,9 +39,7 @@ function notApplicable(v: V): string | null {
  * Divergences found by these vectors that this repository has not been authorized to change. Reported as
  * "DOES NOT CONFORM (known)" and shown as a todo, never counted as conforming.
  */
-const KNOWN: Record<string, string> = {
-  "proposer withdraws (an agent, its own proposal)": "the agent role lacks changes.cancel, so an agent cannot withdraw its own proposal (contract 1.1.0 allows it). Changing roles is a product decision for this application; not made here.",
-};
+const KNOWN: Record<string, string> = {};
 
 const asRc = (p: P): PrincipalInput => ({ id: p.id, type: p.type === "person" ? "user" : p.type === "agent" ? "agent" : "service", roles: p.roles });
 const ADMIN: PrincipalInput = { id: "conformance-admin", type: "user", roles: ["admin"] };

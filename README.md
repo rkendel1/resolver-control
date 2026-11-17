@@ -32,7 +32,7 @@ AppBoundry WebAssembly guest with no network. The only code that talks to Resolv
 | **Environments** | Policies per namespace, freeze, and side-by-side comparison. |
 | **Insights** | Deterministic findings: ungoverned or unowned dependencies, critical single points of failure, missing consumers, drift, changes made directly in Resolver (outside governance), revoked credentials still in use, stale proposals. |
 | **Discovery** | `npm run discover -- <repo>` finds decisions still embedded in code (model ids, provider hosts, endpoints and keys read from the environment) and submits them as candidates. It does not judge them. |
-| **Agents** | Every operation is an AppPort capability, also served over MCP. Agents inspect, declare consumers, propose and submit findings. They cannot approve or execute. |
+| **Agents** | Every operation is an AppPort capability, also served over MCP. Agents inspect, declare consumers, propose and submit findings, and may withdraw their own proposals until execution is claimed. They cannot approve, reject, claim or execute, or withdraw anyone else's proposal. |
 
 ## Run it
 
