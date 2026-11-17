@@ -31,6 +31,7 @@ function notApplicable(v: V): string | null {
   const odd = (v.subject?.approvals ?? []).filter((a: any) => a.principalType !== "person" || a.digest !== v.subject.digest || a.by === v.subject.proposedBy);
   const dup = new Set((v.subject?.approvals ?? []).map((a: any) => a.by)).size !== (v.subject?.approvals ?? []).length;
   if (odd.length || dup) return "this subject cannot be constructed through the application: approve refuses non-person, proposer and duplicate approvals when they are given (contract §3), and the approval signer re-checks them before signing.";
+  if ((v as any).predecessor && !(v as any).predecessor.reconciled) return "an abandoned change here always carries its reconciliation: changes.abandon accepts only a claimed attempt the component settled by reconciliation (requeued: nothing reached Resolver), so an unreconciled abandoned predecessor cannot exist.";
   if (v.operation === "execute" && v.subject?.requiredAtProposal && v.subject.state === "approved") return "not constructible through the API once the approval path applies the ratchet (one approval of a change proposed as critical never reaches approved); claim applies the same rule as defence in depth.";
   return null;
 }
@@ -54,6 +55,11 @@ function codeOf(e: any, op: string, status: string): string {
   if (/is protected/.test(m)) return "protected-scope";
   if (/is frozen/.test(m)) return "frozen";
   if (/Only the proposer may withdraw/.test(m)) return "forbidden-effect";
+  if (/was claimed for execution/.test(m)) return "claimed";
+  if (/not reconciled yet/.test(m)) return "unreconciled";
+  if (/never claimed for execution|only a claimed change requeued after reconciliation/.test(m)) return "wrong-state";
+  if (/Only a person may abandon/.test(m)) return "person-only";
+  if (op === "abandon" && e?.code === "INVALID_ARGUMENT" && /reason/i.test(m)) return "reason-required";
   if (op === "execute" && status === "cancelled") return "revoked";
   if (op === "withdraw" && status === "executing") return "irreversible";
   if (/only a validated change awaiting approval/.test(m)) return "wrong-state";
@@ -96,25 +102,44 @@ vectors.cases.forEach((v: V, i: number) => {
         const crit = s.requiredAtProposal >= 2 ? "critical" : s.criticality;
         await t.as(ADMIN).mutation(api.catalog.register, { ref, title: `conformance ${i}`, category: "integrations", criticality: crit, changeClass: "runtime" });
         // Policy at proposal: the vector's, except freezes and tightening, applied after existing approvals.
-        const initialCount = ["approved", "executing"].includes(s.state) ? Math.max(1, s.approvals.length) : s.policy.approvalsRequired;
+        const postApproval = ["approved", "executing", "done"].includes(s.state);
+        const initialCount = postApproval ? Math.max(1, s.approvals.length) : s.policy.approvalsRequired;
         await t.as(ADMIN).mutation(api.policies.set, { environment: env, protected: s.policy.protected, approvalsRequired: initialCount });
         await settle(engine, 1);
         const proposer: PrincipalInput = { id: s.proposedBy, type: s.proposedBy === "bot" ? "agent" : "user", roles: s.proposedBy === "bot" ? ["agent"] : ["engineer"] };
         const c = await t.as(proposer).mutation(api.changes.proposeRetarget, { ref, basedOnRevision: 1, binding: { value: { url: `https://b.${env}.example.com` } }, reason: "conformance" });
         changeId = c.id;
         await settle(engine, 1); // validation by the component → ready
-        const approvals = s.approvals.length || !["approved", "executing"].includes(s.state) ? s.approvals : [{ by: "ann", principalType: "person", digest: s.digest }];
+        const approvals = s.approvals.length || !postApproval ? s.approvals : [{ by: "ann", principalType: "person", digest: s.digest }];
         for (const a of approvals) await t.as({ id: a.by, type: "user", roles: ["prod_approver"] }).mutation(api.changes.approve, { id: c.id });
         if (s.requiredAtProposal >= 2) await t.as(ADMIN).mutation(api.catalog.register, { ref, title: `conformance ${i}`, category: "integrations", criticality: s.criticality, changeClass: "runtime" });
         if (s.policy.approvalsRequired !== initialCount) await t.as(ADMIN).mutation(api.policies.set, { environment: env, protected: s.policy.protected, approvalsRequired: s.policy.approvalsRequired });
         if (s.policy.frozen) await t.as(ADMIN).mutation(api.policies.freeze, { environment: env, frozen: true, reason: "conformance freeze" });
         if (s.revoked) await t.as(proposer).mutation(api.changes.cancel, { id: c.id });
-        if (s.state === "executing" || s.irreversible) await t.as({ id: "component:resolver", type: "service", roles: ["executor"] }).mutation(api.changes.claim, { id: c.id });
+        const exe = t.as({ id: "component:resolver", type: "service", roles: ["executor"] });
+        const claim = s.state === "executing" || s.state === "done" || s.irreversible || s.claimed;
+        // After claim, settle as the component would: requeue after reconciliation (nothing reached Resolver), or fail.
+        const requeue = claim && v.operation === "abandon" && (v as any).reconciled === true && s.state === "executing";
+        const failed = claim && (s.failed || s.state === "done");
+        if (claim) await exe.mutation(api.changes.claim, { id: c.id });
+        if (requeue) await exe.mutation(api.changes.settle, { id: c.id, attempt: 1, outcome: "requeue", note: "conformance: nothing reached Resolver" });
+        if (failed) await exe.mutation(api.changes.settle, { id: c.id, attempt: 1, outcome: "failed", note: "conformance: refused by Resolver" });
         const st = (await t.as(ADMIN).query(api.changes.get, { id: c.id })).change.status;
-        const want = s.revoked ? "cancelled" : s.irreversible ? "executing" : s.state === "awaiting-approval" ? "ready" : s.state;
+        const want = s.revoked ? "cancelled" : requeue ? "approved" : failed ? "failed" : s.irreversible ? "executing" : s.state === "awaiting-approval" ? "ready" : s.state;
         assert.equal(st, want, `subject constructed in state ${st}, wanted ${want}`);
       }
       if (!s) await settle(engine, 1); // a proposal is based on an observed revision
+      if (!s && (v as any).predecessor) {
+        // An abandoned predecessor on the same reference, built as it happens here: claimed, requeued, abandoned.
+        const exe = t.as({ id: "component:resolver", type: "service", roles: ["executor"] });
+        await t.as(ADMIN).mutation(api.policies.set, { environment: env, protected: true, approvalsRequired: 1 });
+        const p0 = await t.as({ id: "eng0", type: "user", roles: ["engineer"] }).mutation(api.changes.proposeRetarget, { ref, basedOnRevision: 1, binding: { value: { url: `https://old.${env}.example.com` } }, reason: "predecessor" });
+        await settle(engine, 1);
+        await t.as({ id: "ann", type: "user", roles: ["prod_approver"] }).mutation(api.changes.approve, { id: p0.id });
+        await exe.mutation(api.changes.claim, { id: p0.id });
+        await exe.mutation(api.changes.settle, { id: p0.id, attempt: 1, outcome: "requeue", note: "conformance: nothing reached Resolver" });
+        assert.equal((await t.as(ADMIN).mutation(api.changes.abandon, { id: p0.id, reason: "conformance predecessor" })).status, "abandoned");
+      }
       const caller = v.principal ? t.as(asRc(v.principal)) : t;
       let got: { allow: boolean; code?: string; result?: string };
       try {
@@ -128,6 +153,9 @@ vectors.cases.forEach((v: V, i: number) => {
           const isProposer = v.principal!.id === s.proposedBy;
           await caller.mutation(isProposer ? api.changes.cancel : api.changes.reject, { id: changeId!, ...(isProposer ? {} : { note: "conformance reject" }) } as never);
           got = { allow: true };
+        } else if (v.operation === "abandon") {
+          const r = await caller.mutation(api.changes.abandon, { id: changeId!, reason: (v as any).reason });
+          got = r.status === "abandoned" ? { allow: true } : { allow: false, code: `unexpected status ${r.status}` };
         } else { // execute: the component claims
           const r = await caller.mutation(api.changes.claim, { id: changeId! });
           got = r.status === "executing" ? { allow: true } : { allow: false, code: "insufficient-approvals", result: r.status === "ready" ? "awaiting-approval" : r.status };

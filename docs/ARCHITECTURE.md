@@ -58,9 +58,16 @@ proposed ──validate──▶ ready ──approve × N──▶ approved ─�
                           └─▶ superseded (the reference moved)          └─▶ unknown      no answer → reconciled from Resolver's history
 ```
 
+Claiming is the point of no return for withdrawal and rejection (Boundry governance contract 1.2.0 §7), even if the
+attempt is later requeued because nothing reached Resolver. A change requeued after a claim can only finish or be
+**abandoned** (`changes.abandon`): a person with `admin` or `prod_approver`, with a reason, only once the component
+has settled the claimed attempt by reconciliation. `executing` and `unknown` cannot be abandoned: the component
+reconciles them from Resolver's history first. Abandonment preserves the proposal, approvals, claim and execution
+evidence, and rolls nothing back.
+
 | Step | Who | Enforced by |
 |---|---|---|
-| Propose (retarget, introduce, rollback, revert, promote) | `changes.propose` (engineers, agents). The proposer, person or agent, may withdraw (`changes.cancel`) until execution is claimed; withdrawal is a recorded decision, never a deletion | FeltKit roles. Basis revision must equal the observed one. One open change per reference. Never secret material. |
+| Propose (retarget, introduce, rollback, revert, promote) | `changes.propose` (engineers, agents). The proposer, person or agent, may withdraw (`changes.cancel`) until execution is first claimed, even if the attempt is later requeued; withdrawal is a recorded decision, never a deletion | FeltKit roles. Basis revision must equal the observed one. One open change per reference. Never secret material. |
 | Impact | rule (`_rules.ts computeImpact`) at proposal | Recorded on the change: differences, declared consumers, observed credential relationships, fallback, propagation (TTL), warnings, unknowns. |
 | Validate | component | Resolver's own `checkBinding` (`@appport/resolver-core`), revision freshness (Resolver's history), environment isolation, credential existence and kind (resolve as executor). Catalog, schema, agent pins and write grant are **deferred** to Resolver's write and labelled so. |
 | Approve | a **person** with `changes.approve` (+ `changes.approve.protected` in protected environments) | Not the proposer; not twice; not in a frozen environment; not if the reference moved. Required count = policy, at least 2 for `critical`. |

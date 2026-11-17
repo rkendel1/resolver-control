@@ -280,9 +280,49 @@ export const reject = app.mutation({
     const who = ctx.auth.requirePrincipal();
     if (who.type !== "user") fail("FORBIDDEN", "Only a person may reject a change.");
     const change = await load(ctx, id);
+    if (change.execution) claimedFail(change);
     if (!["proposed", "ready", "approved"].includes(change.status)) fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status}.`);
     await ctx.db.patch(changes, id, { status: "rejected", decision: { outcome: "rejected", by: who.id, at: Date.now(), note }, updatedAt: Date.now() });
     await record(ctx, "change", id, "change.rejected", { number: change.number, note });
+    return (await ctx.db.get(changes, id))!;
+  },
+});
+
+/**
+ * Claiming execution ends withdrawal and rejection (Boundry governance contract 1.2.0 §7), whatever happened since:
+ * a change requeued after an interrupted attempt has still been claimed. A person may abandon it instead.
+ */
+function claimedFail(change: { number: number; execution?: { attempt: number } }): never {
+  fail("FAILED_PRECONDITION", `CHG-${change.number} was claimed for execution (attempt ${change.execution!.attempt}); it can no longer be withdrawn or rejected. A person may abandon it (changes.abandon) once its outcome is reconciled.`);
+}
+
+/**
+ * A person stops pursuing a claimed change (contract §7a). Only when the claimed attempt has been settled by
+ * reconciliation and requeued: the engine requeues only after establishing that nothing reached Resolver (the signer
+ * was unreachable before sending, or Resolver's history shows the write absent). An attempt still executing, or
+ * unknown, is refused: the component reconciles it from Resolver first. Never withdrawal, never rollback: approvals,
+ * claim and execution evidence stay on the record.
+ */
+export const abandon = app.mutation({
+  access: "changes.abandon",
+  args: { id: s.string(), reason: s.string({ maxLength: 1000 }) },
+  returns: Change,
+  capability: { name: "changes.abandon", description: "Stop pursuing a change that was claimed for execution and requeued after reconciliation (nothing reached Resolver). A person only, with a reason. Not withdrawal, not rollback." },
+  handler: async (ctx, { id, reason }) => {
+    const who = ctx.auth.requirePrincipal();
+    if (who.type !== "user") fail("FORBIDDEN", "Only a person may abandon a change.");
+    const change = await load(ctx, id);
+    // Contract §7a order: state before reason, so the answer names the more fundamental problem.
+    if (!change.execution) fail("FAILED_PRECONDITION", `CHG-${change.number} was never claimed for execution: withdraw or reject it instead.`);
+    if (change.status === "executing" || change.status === "unknown") fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status}: its outcome is not reconciled yet. The resolver component reconciles it from Resolver's history first; abandonment is refused until then.`);
+    if (change.status !== "approved" || change.execution.finishedAt === undefined) fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status}; only a claimed change requeued after reconciliation can be abandoned.`);
+    if (!reason.trim()) fail("INVALID_ARGUMENT", "A reason is required: say why the change is abandoned.");
+    const abandonment = {
+      by: who.id, at: Date.now(), reason, atStatus: change.status, attempt: change.execution.attempt,
+      reconciliation: { settledAt: change.execution.finishedAt, outcome: "requeue: not applied", note: change.execution.note ?? "requeued by the resolver component" },
+    };
+    await ctx.db.patch(changes, id, { status: "abandoned", abandonment, updatedAt: Date.now() });
+    await record(ctx, "change", id, "change.abandoned", { number: change.number, attempt: change.execution.attempt, reason, reconciliation: abandonment.reconciliation.note });
     return (await ctx.db.get(changes, id))!;
   },
 });
@@ -296,6 +336,7 @@ export const cancel = app.mutation({
     const who = ctx.auth.requirePrincipal();
     const change = await load(ctx, id);
     if (change.proposedBy !== who.id) fail("FORBIDDEN", "Only the proposer may withdraw a change; others reject it.");
+    if (change.execution) claimedFail(change);
     if (!["proposed", "ready", "approved", "invalid"].includes(change.status)) fail("FAILED_PRECONDITION", `CHG-${change.number} is ${change.status}.`);
     await ctx.db.patch(changes, id, { status: "cancelled", decision: { outcome: "cancelled", by: who.id, at: Date.now(), ...(note ? { note } : {}) }, updatedAt: Date.now() });
     await record(ctx, "change", id, "change.cancelled", { number: change.number, note: note ?? null });

@@ -1,9 +1,9 @@
 {
-  "contract": "boundry.governance@1.1.0",
+  "contract": "boundry.governance@1.2.0",
   "vendoredFrom": {
     "repository": "rkendel1/boundry-maint",
     "path": "contracts/governance/v1",
-    "commit": "2cc2e2f688c39aa5cd2c9228a9becf9d2bb8fd9c"
+    "commit": "d1ad99593cdab5b9c34e8ece46438f46b9955ace"
   },
   "cases": [
     {
@@ -117,9 +117,9 @@
       "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
     },
     {
-      "name": "nothing is withdrawn after the irreversible step",
+      "name": "nothing is withdrawn after an external mutation (claimed)",
       "outcome": "conforms",
-      "detail": "expected {\"allow\":false,\"code\":\"irreversible\"}, got {\"allow\":false,\"code\":\"irreversible\"}"
+      "detail": "expected {\"allow\":false,\"code\":\"irreversible\",\"codes\":[\"claimed\",\"irreversible\"]}, got {\"allow\":false,\"code\":\"claimed\"}"
     },
     {
       "name": "admin triggers",
@@ -210,6 +210,81 @@
       "name": "an agent may not withdraw someone else's proposal",
       "outcome": "conforms",
       "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "an agent withdraws its own approved, unclaimed proposal",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "withdrawal is refused once execution is claimed, before any external mutation",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"claimed\"}, got {\"allow\":false,\"code\":\"claimed\"}"
+    },
+    {
+      "name": "rejection is refused once execution is claimed",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"claimed\"}, got {\"allow\":false,\"code\":\"claimed\"}"
+    },
+    {
+      "name": "withdrawal is refused after a failure that followed the claim",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"claimed\"}, got {\"allow\":false,\"code\":\"claimed\"}"
+    },
+    {
+      "name": "a prod approver abandons a claimed, stuck execution after reconciling",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "an admin abandons a claimed, stuck execution after reconciling",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
+    },
+    {
+      "name": "an agent never abandons, even its own proposal",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"codes\":[\"person-only\",\"forbidden-effect\"]}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "a component never abandons",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"codes\":[\"person-only\",\"forbidden-effect\"]}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "an engineer cannot abandon",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"forbidden-effect\"}, got {\"allow\":false,\"code\":\"forbidden-effect\"}"
+    },
+    {
+      "name": "nothing unclaimed is abandoned: withdraw or reject instead",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"wrong-state\"}, got {\"allow\":false,\"code\":\"wrong-state\"}"
+    },
+    {
+      "name": "a terminal subject is not abandoned",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"wrong-state\"}, got {\"allow\":false,\"code\":\"wrong-state\"}"
+    },
+    {
+      "name": "abandonment needs a reason",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"reason-required\"}, got {\"allow\":false,\"code\":\"reason-required\"}"
+    },
+    {
+      "name": "abandonment is refused while an authority cannot be reconciled",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":false,\"code\":\"unreconciled\"}, got {\"allow\":false,\"code\":\"unreconciled\"}"
+    },
+    {
+      "name": "a replacement is refused while an abandoned predecessor is unreconciled",
+      "outcome": "not-applicable",
+      "detail": "an abandoned change here always carries its reconciliation: changes.abandon accepts only a claimed attempt the component settled by reconciliation (requeued: nothing reached Resolver), so an unreconciled abandoned predecessor cannot exist."
+    },
+    {
+      "name": "a replacement is allowed once the abandoned predecessor was reconciled",
+      "outcome": "conforms",
+      "detail": "expected {\"allow\":true}, got {\"allow\":true}"
     }
   ]
 }
