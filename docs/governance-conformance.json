@@ -1,9 +1,9 @@
 {
-  "contract": "boundry.governance@1.2.0",
+  "contract": "boundry.governance@1.2.1",
   "vendoredFrom": {
     "repository": "rkendel1/boundry-maint",
     "path": "contracts/governance/v1",
-    "commit": "d1ad99593cdab5b9c34e8ece46438f46b9955ace"
+    "commit": "32a38f5dfe2f0a56c046159c30ed29c5853019ab"
   },
   "cases": [
     {
