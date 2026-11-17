@@ -1,0 +1,15 @@
+{
+  "contract": "boundry.governance",
+  "version": "1.2.0",
+  "source": {
+    "repository": "rkendel1/boundry-maint",
+    "path": "contracts/governance/v1",
+    "commit": "d1ad99593cdab5b9c34e8ece46438f46b9955ace"
+  },
+  "sha256": {
+    "contract.json": "a5fad0bdcd44bf7727630bb53823e1420260c614857c55b234b80f64234ee27c",
+    "vectors.json": "31be81e3b6810d8326f61d15ed78021dd8a2a285d542222399da86467eb9e2d4",
+    "SPEC.md": "69b8a218ef945e155ea0aa42db24db4a36bcd7a48a83d8afb20e199121c56ee2"
+  },
+  "note": "Vendored, not edited. Resolver Control's tests verify these digests and run vectors.json against this application's own mutations (tests/governance-contract.test.ts)."
+}

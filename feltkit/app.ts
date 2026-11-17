@@ -31,12 +31,15 @@ export const app = feltkit({
     // Approvers decide changes in unprotected environments.
     approver: [...READ, "changes.approve"],
     // Production approvers also decide changes in protected environments.
-    prod_approver: [...READ, "changes.approve", "changes.approve.protected"],
+    // Production approvers also decide changes in protected environments, and may abandon a claimed change whose
+    // outcome has been reconciled (Boundry governance contract §7a).
+    prod_approver: [...READ, "changes.approve", "changes.approve.protected", "changes.abandon"],
     // Administrators set policies (protection, approvals, freezes) and the Resolver connection.
-    admin: [...READ, "catalog.write", "policies.write", "settings.write", "demo.seed"],
-    // Agents inspect, declare consumers, submit discovery findings and propose. Never approve or execute;
-    // the application also refuses an approval from any non-person principal, whatever its roles.
-    agent: [...READ, "consumers.write", "changes.propose", "discovery.write"],
+    admin: [...READ, "catalog.write", "policies.write", "settings.write", "demo.seed", "changes.abandon"],
+    // Agents inspect, declare consumers, submit discovery findings and propose, and may withdraw their OWN
+    // proposals before execution is claimed (cancel checks the proposer and the status). Never approve, reject,
+    // claim or execute; the application also refuses an approval from any non-person principal, whatever its roles.
+    agent: [...READ, "consumers.write", "changes.propose", "changes.cancel", "discovery.write"],
     // A consuming application may declare that it resolves a reference (and nothing else).
     consumer_app: ["catalog.read", "consumers.declare"],
     // The resolver component: records observations, validation and execution evidence; claims approved work.
@@ -255,7 +258,7 @@ export const Adoption = s.object({
   functionallyVerified: s.null(),
 });
 
-export const STATUSES = ["proposed", "ready", "invalid", "approved", "executing", "verified", "failed", "unknown", "superseded", "rejected", "cancelled"] as const;
+export const STATUSES = ["proposed", "ready", "invalid", "approved", "executing", "verified", "failed", "unknown", "superseded", "rejected", "cancelled", "abandoned"] as const;
 
 /** A proposed, approved, executed and verified change to what a reference resolves to. */
 export const changes = app.collection("changes", {
@@ -289,6 +292,16 @@ export const changes = app.collection("changes", {
     note: s.optional(s.string()),
     /** The change authorization the approval signer issued for this attempt: its id and expiry, never the token. */
     authorization: s.optional(s.object({ jti: s.string(), expiresAt: s.string(), issuedAt: s.number() })),
+  })),
+  /** A person stopped pursuing this change after it was claimed (contract §7a): never withdrawal, never rollback. */
+  abandonment: s.optional(s.object({
+    by: s.string(),
+    at: s.number(),
+    reason: s.string(),
+    atStatus: s.string(),
+    attempt: s.integer(),
+    /** What Resolver was found to hold when the claimed attempt was settled: the reconciliation abandonment relies on. */
+    reconciliation: s.object({ settledAt: s.number(), outcome: s.string(), note: s.string() }),
   })),
   verification: s.optional(s.object({
     at: s.number(),

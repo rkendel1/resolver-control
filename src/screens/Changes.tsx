@@ -7,7 +7,7 @@ import { askReason, attempt, Actor, Basis, can, Card, Empty, EVENT_LABEL, exact,
 const GROUPS: Array<[string, string, string[]]> = [
   ["open", "Open", ["proposed", "ready", "approved", "executing", "unknown"]],
   ["verified", "Verified", ["verified"]],
-  ["stopped", "Did not happen", ["failed", "invalid", "superseded", "rejected", "cancelled"]],
+  ["stopped", "Did not happen", ["failed", "invalid", "superseded", "rejected", "cancelled", "abandoned"]],
   ["all", "All", []],
 ];
 
@@ -135,7 +135,7 @@ export function ChangeDetail({ id }: { id: string }) {
   return (
     <Live state={state} what="this change">
       {({ change: c, policy, requiredApprovals, currentRevision }) => {
-        const terminal = ["verified", "failed", "superseded", "rejected", "cancelled", "invalid"].includes(c.status);
+        const terminal = ["verified", "failed", "superseded", "rejected", "cancelled", "invalid", "abandoned"].includes(c.status);
         const mine = c.proposedBy === app.principal.id;
         const approvedByMe = c.approvals.some((a) => a.by === app.principal.id);
         const mayApprove = can(app.permissions, "changes.approve") && (!policy.protected || can(app.permissions, "changes.approve.protected")) && app.principal.type === "user" && !mine && !approvedByMe;
