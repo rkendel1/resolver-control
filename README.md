@@ -165,7 +165,7 @@ one shared copy of the data, and development mode relaxes production safeguards.
 provider keys, credentials or customer data. For production, use `npx feltkit deploy --target fly` without
 `scripts/demo-artifact.mjs`.
 
-Resolver itself is not part of the demo deployment, so the app shows *Resolver not connected*; `npm run demo` is the full local stack.
+The demo image also installs Resolver (`@appport/resolver`) and `scripts/demo-resolver.mjs` runs it beside the app with demo references in `staging` and `prod`, an executor key in FeltKit's credential custody, and the Settings pre-filled, so the demo opens connected. `npm run demo` is the full local stack.
 
 ### Make your own FeltKit app a demo
 

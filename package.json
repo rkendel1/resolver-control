@@ -23,12 +23,12 @@
     "signer": "node --import tsx signer/server.ts"
   },
   "dependencies": {
-    "@appport/resolver-client": "file:vendor/appport-resolver-client-0.3.0.tgz",
-    "@appport/resolver-core": "file:vendor/appport-resolver-core-0.2.0.tgz",
-    "@feltdb/feltkit": "0.3.25",
-    "@stack-ui/core": "^0.8.1",
-    "@stack-ui/react": "^0.8.1",
-    "@stack-ui/tokens": "^0.8.1",
+    "@appport/resolver-client": "0.3.0",
+    "@appport/resolver-core": "0.2.0",
+    "@feltdb/feltkit": "0.3.34",
+    "@stack-ui/core": "^0.9.0",
+    "@stack-ui/react": "^0.9.0",
+    "@stack-ui/tokens": "^0.9.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
@@ -42,6 +42,6 @@
     "vite": "7.3.7"
   },
   "overrides": {
-    "@appport/resolver-core": "file:vendor/appport-resolver-core-0.2.0.tgz"
+    "@appport/resolver-core": "0.2.0"
   }
 }

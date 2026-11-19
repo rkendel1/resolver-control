@@ -30,6 +30,6 @@ async function step(name: string, run: () => Promise<unknown>, done: string[] = 
 }
 
 // Ada (admin) records the demo governance metadata: policies, owners, criticality, consumers.
-// Resolver itself is not part of the demo deployment, so the app shows "Resolver not connected".
+// With a Resolver beside the app (argv[3], scripts/demo-resolver.mjs) the settings point at it, so the demo opens connected.
 const ada = await as("ada");
-await step("demo policies, owners and consumers", () => ada.mutation(api.demo.seed, {}));
+await step("demo policies, owners and consumers", () => ada.mutation(api.demo.seed, process.argv[3] ? { resolverUrl: process.argv[3] } : {}));

@@ -18,6 +18,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { startDemoResolver } from "./demo-resolver.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const feltkit = `${root}node_modules/@feltdb/feltkit/bin/feltkit.js`;
@@ -26,10 +27,15 @@ if (process.env.FELTKIT_ENV && process.env.FELTKIT_ENV !== "development") {
   console.error(`[demo] FELTKIT_ENV is "${process.env.FELTKIT_ENV}"; a demo deployment runs the development environment. Unset it.`);
   process.exit(1);
 }
+// Where the image ships Resolver (RESOLVER_SERVICE_DIR), run it beside the app so the demo opens connected.
+const resolver = process.env.RESOLVER_SERVICE_DIR
+  ? await startDemoResolver(process.env.RESOLVER_SERVICE_DIR, `${process.env.DEMO_RESOLVER_DIR ?? process.env.FELTKIT_STATE_DIR ?? `${root}.tmp/demo`}/resolver-demo`).catch((e) => (console.error(`[demo] Resolver not started: ${e.message}`), null))
+  : null;
 const args = [feltkit, "start", "--env", "development", "--host", process.env.HOST ?? "0.0.0.0", ...process.argv.slice(2)];
-const server = spawn(process.execPath, args, { cwd: root, stdio: ["inherit", "pipe", "inherit"] });
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.kill(signal));
-server.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+const env = resolver ? { ...process.env, FELTKIT_CREDENTIAL_RESOLVER_API_KEY: resolver.executor } : process.env;
+const server = spawn(process.execPath, args, { cwd: root, env, stdio: ["inherit", "pipe", "inherit"] });
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => (resolver?.child.kill(signal), server.kill(signal)));
+server.on("exit", (code, signal) => (resolver?.child.kill(), process.exit(code ?? (signal ? 1 : 0))));
 
 let seeded = false;
 server.stdout.on("data", (chunk) => {
@@ -37,15 +43,15 @@ server.stdout.on("data", (chunk) => {
   const url = !seeded && String(chunk).match(/serving (https?:\/\/\S+)/)?.[1];
   if (!url) return;
   seeded = true;
-  void seed(url);
+  void seed(url, resolver?.url);
 });
 
-async function seed(url) {
+async function seed(url, resolverUrl) {
   const script = fileURLToPath(new URL("./demo-seed.ts", import.meta.url));
   if (process.env.DEMO_SEED === "0" || !existsSync(script)) return;
   // Reach the server on loopback whatever interface it listens on.
   const local = url.replace(/\/\/[^/:]+/, "//127.0.0.1");
   // tsx ships with FeltKit; `--import` resolves it from the project.
-  const child = spawn(process.execPath, ["--import", "tsx", script, local], { cwd: root, stdio: "inherit" });
+  const child = spawn(process.execPath, ["--import", "tsx", script, local, ...(resolverUrl ? [resolverUrl] : [])], { cwd: root, stdio: "inherit" });
   child.on("exit", (code) => console.log(code === 0 ? "[demo] Demo data ready." : `[demo] Loading demo data failed (exit ${code}); the app is still served.`));
 }

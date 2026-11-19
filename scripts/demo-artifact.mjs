@@ -47,7 +47,7 @@ if (!docker.includes(START)) fail(`The Dockerfile does not start the app with ${
 
 // What the demo needs at runtime: the launcher, the seed, the generated function references, and declared extras.
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-const files = ["scripts/demo-server.mjs", "scripts/demo-seed.ts", "feltkit/_generated", ...(pkg.feltkitDemo?.include ?? [])];
+const files = ["scripts/demo-server.mjs", "scripts/demo-resolver.mjs", "scripts/demo-seed.ts", "feltkit/_generated", ...(pkg.feltkitDemo?.include ?? [])];
 for (const file of files) {
   if (!existsSync(join(root, file))) continue;
   mkdirSync(dirname(join(dir, file)), { recursive: true });
@@ -69,6 +69,9 @@ docker = docker
       "# Demo: FeltKit's development runtime files live on the volume beside the state (created at start),",
       "# and the app may write under .feltkit (the seed's cache).",
       "RUN mkdir -p .feltkit && ln -sfn /data/development .feltkit/development && chown node:node .feltkit",
+      "# Demo: a real Resolver beside the app, in its own directory (the app keeps one @feltdb/core).",
+      "RUN mkdir -p /opt/resolver && cd /opt/resolver && npm init -y >/dev/null && npm install --no-audit --no-fund @appport/resolver@0.4.0 && chown -R node:node /opt/resolver",
+      "ENV RESOLVER_SERVICE_DIR=/opt/resolver",
       "USER node",
     ].join("\n"),
   )
