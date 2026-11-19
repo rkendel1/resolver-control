@@ -8,6 +8,7 @@
     "dev": "feltkit dev",
     "build": "feltkit build",
     "start": "feltkit start",
+    "start:demo": "node scripts/demo-server.mjs",
     "test": "feltkit test",
     "test:e2e": "node --test --test-concurrency=1 e2e/*.test.mjs",
     "inspect": "feltkit inspect",
