@@ -8,6 +8,8 @@
     "dev": "feltkit dev",
     "build": "feltkit build",
     "start": "feltkit start",
+    "start:demo": "node scripts/demo-server.mjs",
+    "deploy:demo": "feltkit deploy --target fly && node scripts/demo-artifact.mjs",
     "test": "feltkit test",
     "test:e2e": "node --test --test-concurrency=1 e2e/*.test.mjs",
     "inspect": "feltkit inspect",
